@@ -13,6 +13,10 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <array>
+
+constexpr int NUM_SHAPES = 5;
+constexpr float ASPECT_RATIO = 4.0/3.0;
 
 struct Shape {
     int sides;
@@ -22,8 +26,13 @@ struct Shape {
     glm::vec4 line_color;
     glm::vec4 fill_color;
 
-    GLuint vbo_vertex;
-    std::vector<uint32_t> vertex_index;
+    GLuint vbo_line_vertex;
+    GLuint vbo_line_index;
+    int line_index_count;
+
+    GLuint vbo_fill_vertex;
+    GLuint vbo_fill_index;
+    int fill_index_count;
 };
 
 struct AppState {
@@ -36,7 +45,11 @@ struct AppState {
     GLuint program;
     GLuint vao;
 
-    std::vector<Shape> shape;
+    GLuint vbo_bg_vertex;
+    GLuint vbo_bg_index;
+    GLuint bg_index_count;
+
+    std::array<Shape, NUM_SHAPES> shape;
 };
 
 static const char *vertex_shader = R"(
@@ -92,6 +105,31 @@ Shape create_shape(int sides, float radius, float line_thickness) {
 
         vert.push_back(glm::vec2{x, y});
     }
+
+    // triangles to fill in the shape
+    std::vector<glm::vec2> fill_pts;
+    std::vector<uint32_t> fill_idx;
+
+    fill_pts = vert;
+    fill_pts.push_back(glm::vec2{0.0f, 0.0f}); // origin of shape
+
+    for (int i=0; i < static_cast<int>(vert.size()); i++) {
+        int j = (i + 1) % vert.size();
+
+        fill_idx.push_back(i);
+        fill_idx.push_back(j);
+        fill_idx.push_back(fill_pts.size() - 1);
+    }
+
+    glGenBuffers(1, &shape.vbo_fill_vertex);
+    glBindBuffer(GL_ARRAY_BUFFER, shape.vbo_fill_vertex);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*fill_pts.size(), fill_pts.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &shape.vbo_fill_index);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shape.vbo_fill_index);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*fill_idx.size(), fill_idx.data(), GL_STATIC_DRAW);
+
+    shape.fill_index_count = fill_idx.size();
 
     // quads for each line
     std::vector<glm::vec2> tri_pts;
@@ -168,11 +206,15 @@ Shape create_shape(int sides, float radius, float line_thickness) {
         }
     }
 
-    glGenBuffers(1, &shape.vbo_vertex);
-    glBindBuffer(GL_ARRAY_BUFFER, shape.vbo_vertex);
+    glGenBuffers(1, &shape.vbo_line_vertex);
+    glBindBuffer(GL_ARRAY_BUFFER, shape.vbo_line_vertex);
     glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*tri_pts.size(), tri_pts.data(), GL_STATIC_DRAW);
 
-    shape.vertex_index = tri_idx;
+    glGenBuffers(1, &shape.vbo_line_index);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shape.vbo_line_index);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*tri_idx.size(), tri_idx.data(), GL_STATIC_DRAW);
+
+    shape.line_index_count = tri_idx.size();
 
     return shape;
 }
@@ -204,6 +246,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(gl_debug_callback, 0);
+    glDisable(GL_CULL_FACE);
 
     as->v_shader = glCreateShader(GL_VERTEX_SHADER);
     as->f_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -237,18 +280,36 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     glGenVertexArrays(1, &as->vao);
     glBindVertexArray(as->vao);
 
-    Shape s = create_shape(5, 100.f, 10.f);
-    s.center = glm::vec2{320.f, 240.f};
-    s.line_color = glm::vec4{1.f, 1.f, 1.f, 1.f};
+    int sides = 3;
+    for (auto &s: as->shape) {
+        s = create_shape(sides, 1.f, 0.1f);
+        s.line_color = glm::vec4{1.f, 1.f, 1.f, 1.f};
+        s.fill_color = glm::vec4{0.2f, 0.8f, 0.2f, 1.f};
 
-    as->shape.push_back(s);
+        sides++;
+    }
 
+    glGenBuffers(1, &as->vbo_bg_vertex);
+    glBindBuffer(GL_ARRAY_BUFFER, as->vbo_bg_vertex);
+    std::array<glm::vec2, 4> empty;
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*4, empty.data(), GL_DYNAMIC_DRAW);
+
+    glGenBuffers(1, &as->vbo_bg_index);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, as->vbo_bg_index);
+    std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*index.size(), index.data(), GL_STATIC_DRAW);
+    as->bg_index_count = index.size();
+    
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     switch (event->type) {
         case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
+        case SDL_EVENT_KEY_DOWN:
+        if (event->key.key == SDLK_ESCAPE) {
+            SDL_Quit();
+        }
     }
     
     return SDL_APP_CONTINUE;
@@ -269,32 +330,75 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState *as = static_cast<AppState*>(appstate);
 
-    int w, h;
-    if (!SDL_GetWindowSize(as->window, &w, &h)) {
+    int win_w, win_h;
+    if (!SDL_GetWindowSize(as->window, &win_w, &win_h)) {
         std::cerr << SDL_GetError() << "\n";
         return SDL_APP_FAILURE;
     }
 
-    glViewport(0, 0, w, h);
-    glm::mat4 ortho = glm::ortho(0.0f, w*1.0f, h*1.0f, 0.0f);
+    glViewport(0, 0, win_w, win_h);
+    glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
 
     glUseProgram(as->program);
     glUniformMatrix4fv(glGetUniformLocation(as->program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
 
     glDisable(GL_DEPTH_TEST);
-    glClearColor(0.2, 0.2, 0.2, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glBindVertexArray(as->vao);
+
+    float cx, cy;
+    SDL_GetMouseState(&cx, &cy);
+
+    float w, h, xoff=0, yoff=0;
+
+    if (win_w > win_h) {
+        h = win_h;
+        w = win_h * ASPECT_RATIO;
+        xoff = (win_w - w)/2;
+    } else {
+        w = win_w;
+        h = win_w / ASPECT_RATIO;
+        yoff = (win_h - h) /2;
+    }
+
+    std::array<glm::vec2, 4> bg;
+    bg[0] = glm::vec2{xoff, yoff};
+    bg[1] = glm::vec2{xoff + w, yoff};
+    bg[2] = glm::vec2{xoff + w, yoff + h};
+    bg[3] = glm::vec2{xoff, yoff + h};
+   
+    glm::vec2 origin{0.f, 0.f};
+    glm::vec4 color{0.3f, 0.3f, 0.3f, 1.0f};
+    glUniform2fv(glGetUniformLocation(as->program, "center"), 1, &origin[0]);
+    glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &color[0]);
+
+    glBindBuffer(GL_ARRAY_BUFFER, as->vbo_bg_vertex);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*4, bg.data());
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, as->vbo_bg_index);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glDrawElements(GL_TRIANGLES, as->bg_index_count, GL_UNSIGNED_INT, 0);
 
-    for (const auto &s: as->shape) {
-        glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &s.line_color[0]);
+    for (auto &s: as->shape) {
+        s.center = glm::vec2{cx, cy};
+
         glUniform2fv(glGetUniformLocation(as->program, "center"), 1, &s.center[0]);
 
-        glBindBuffer(GL_ARRAY_BUFFER, s.vbo_vertex);
-        glDrawElements(GL_TRIANGLES, s.vertex_index.size(), GL_UNSIGNED_INT, s.vertex_index.data());
+        glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &s.fill_color[0]);
+        glBindBuffer(GL_ARRAY_BUFFER, s.vbo_fill_vertex);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.vbo_fill_index);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        glDrawElements(GL_TRIANGLES, s.fill_index_count, GL_UNSIGNED_INT, 0);
+  
+        glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &s.line_color[0]);
+        glBindBuffer(GL_ARRAY_BUFFER, s.vbo_line_vertex);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.vbo_line_index);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        glDrawElements(GL_TRIANGLES, s.line_index_count, GL_UNSIGNED_INT, 0);
     }
 
     SDL_GL_SwapWindow(as->window);
