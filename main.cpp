@@ -58,13 +58,16 @@ struct AppState {
     GLuint program;
     GLuint vao;
 
+    bool init = false;
+
     // actual drawing area
-    int xoff, yoff;
-    int w, h;     
-    int xdiv, ydiv;
+    float xoff, yoff;
+    float w, h;     
+    float xdiv, ydiv;
 
     GLPrimitive bg;
 
+    int selected_shape = -1;
     std::array<Shape, NUM_SHAPES> shape;
     std::array<int, NUM_SHAPES> shape_order;
 };
@@ -393,24 +396,57 @@ void update_gl_primitives(AppState &as) {
     }
 }
 
+glm::vec2 shape_index_to_src_pos(const AppState &as, int idx) {
+    return glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv};
+}
+
+glm::vec2 shape_index_to_dst_pos(const AppState &as, int idx) {
+    return glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv*3};
+}
+
+int find_selected_shape(const AppState &as) {
+    float cx, cy;
+    SDL_GetMouseState(&cx, &cy);
+
+    int selected_shape = -1;
+
+    for (int i=0; i < NUM_SHAPES; i++) {
+        glm::vec2 pos = shape_index_to_src_pos(as, i); 
+
+        const auto &s = as.shape[i];
+        if (glm::length(pos - glm::vec2{cx, cy}) < s.radius * s.line.scale) {
+            selected_shape = i;
+            break;
+        }
+    }
+
+    return selected_shape;
+}
+
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     AppState &as = *static_cast<AppState*>(appstate);
 
     switch (event->type) {
         case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
-        if (event->key.key == SDLK_ESCAPE) {
-            SDL_Quit();
-        }
-        break;
+            if (event->key.key == SDLK_ESCAPE) {
+                SDL_Quit();
+            }
+            break;
 
         case SDL_EVENT_WINDOW_RESIZED:
-        case SDL_EVENT_WINDOW_SHOWN:
-        recalc_drawing_area(as);
-        update_background(as);
-        update_gl_primitives(as);
+            recalc_drawing_area(as);
+            update_background(as);
+            update_gl_primitives(as);
+            break;
 
-        break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            as.selected_shape = find_selected_shape(as);
+            break;
+
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            as.selected_shape = -1;
+            break;
     }
     
     return SDL_APP_CONTINUE;
@@ -433,6 +469,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     glUseProgram(as.program);
 
+    if (!as.init) {
+        recalc_drawing_area(as);
+        update_background(as);
+        update_gl_primitives(as);
+        as.init = true;
+    }
+
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -447,14 +490,19 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = as.shape[i];
 
-        s.fill.trans = glm::vec2{as.xoff + (i+1)*as.xdiv, as.yoff + as.ydiv};
-        s.line.trans = glm::vec2{as.xoff + (i+1)*as.xdiv, as.yoff + as.ydiv};
+        if (i == as.selected_shape) {
+            s.fill.trans = glm::vec2{cx, cy};
+        } else {
+            s.fill.trans = shape_index_to_src_pos(as, i);
+        }
+
+        s.line.trans = s.fill.trans;
 
         draw_gl_primitive(as.program, s.fill);
         draw_gl_primitive(as.program, s.line);
 
         int idx = as.shape_order[i];
-        s.line.trans = glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv*3};
+        s.line.trans = shape_index_to_dst_pos(as, idx);
         
         draw_gl_primitive(as.program, s.line);
     }
