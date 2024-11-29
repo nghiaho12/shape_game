@@ -70,6 +70,7 @@ struct AppState {
     int selected_shape = -1;
     std::array<Shape, NUM_SHAPES> shape;
     std::array<int, NUM_SHAPES> shape_order;
+    std::array<bool, NUM_SHAPES> shape_done;
 };
 
 static const char *vertex_shader = R"(
@@ -404,14 +405,23 @@ glm::vec2 shape_index_to_dst_pos(const AppState &as, int idx) {
     return glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv*3};
 }
 
-int find_selected_shape(const AppState &as) {
+int find_selected_shape(const AppState &as, bool dst) {
     float cx, cy;
     SDL_GetMouseState(&cx, &cy);
 
     int selected_shape = -1;
 
     for (int i=0; i < NUM_SHAPES; i++) {
-        glm::vec2 pos = shape_index_to_src_pos(as, i); 
+        glm::vec2 pos;
+
+        if (dst) {
+            pos = shape_index_to_dst_pos(as, i); 
+        } else {
+            if (as.shape_done[i]) {
+                continue;
+            }
+            pos = shape_index_to_src_pos(as, i); 
+        }
 
         const auto &s = as.shape[i];
         if (glm::length(pos - glm::vec2{cx, cy}) < s.radius * s.line.scale) {
@@ -441,10 +451,18 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            as.selected_shape = find_selected_shape(as);
+            as.selected_shape = find_selected_shape(as, false);
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (as.selected_shape != -1) {
+                int dst_idx = find_selected_shape(as, true);
+
+                if (as.shape_order[as.selected_shape] == dst_idx) {
+                    as.shape_done[as.selected_shape] = true;
+                }
+            }
+
             as.selected_shape = -1;
             break;
     }
@@ -489,22 +507,30 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = as.shape[i];
-
-        if (i == as.selected_shape) {
-            s.fill.trans = glm::vec2{cx, cy};
-        } else {
-            s.fill.trans = shape_index_to_src_pos(as, i);
-        }
-
-        s.line.trans = s.fill.trans;
-
-        draw_gl_primitive(as.program, s.fill);
-        draw_gl_primitive(as.program, s.line);
-
         int idx = as.shape_order[i];
-        s.line.trans = shape_index_to_dst_pos(as, idx);
-        
-        draw_gl_primitive(as.program, s.line);
+
+        if (as.shape_done[i]) {
+            s.line.trans = shape_index_to_dst_pos(as, idx);
+            s.fill.trans = s.line.trans;
+            
+            draw_gl_primitive(as.program, s.fill);
+            draw_gl_primitive(as.program, s.line);
+        } else {
+            if (i == as.selected_shape) {
+                s.fill.trans = glm::vec2{cx, cy};
+            } else {
+                s.fill.trans = shape_index_to_src_pos(as, i);
+            }
+
+            s.line.trans = s.fill.trans;
+
+            draw_gl_primitive(as.program, s.fill);
+            draw_gl_primitive(as.program, s.line);
+
+            s.line.trans = shape_index_to_dst_pos(as, idx);
+            
+            draw_gl_primitive(as.program, s.line);
+        }
     }
 
     SDL_GL_SwapWindow(as.window);
