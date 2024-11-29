@@ -57,12 +57,13 @@ static const char *vertex_shader = R"(
 
 layout(location = 0) in vec2 position;
 uniform vec2 center;
+uniform float scale;
 uniform vec4 color;
 uniform mat4 projection_matrix;
 out vec4 v_color;
 
 void main() {
-    gl_Position = projection_matrix * vec4(position + center, 0.0, 1.0);
+    gl_Position = projection_matrix * vec4(position*scale + center, 0.0, 1.0);
     v_color = color;
 })";
 
@@ -372,6 +373,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glm::vec2 origin{0.f, 0.f};
     glm::vec4 color{0.3f, 0.3f, 0.3f, 1.0f};
     glUniform2fv(glGetUniformLocation(as->program, "center"), 1, &origin[0]);
+    glUniform1f(glGetUniformLocation(as->program, "scale"), 1.0f);
     glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &color[0]);
 
     glBindBuffer(GL_ARRAY_BUFFER, as->vbo_bg_vertex);
@@ -381,8 +383,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glDrawElements(GL_TRIANGLES, as->bg_index_count, GL_UNSIGNED_INT, 0);
 
-    for (auto &s: as->shape) {
-        s.center = glm::vec2{cx, cy};
+    float xdiv = w*1.f / (NUM_SHAPES + 1);
+    float ydiv = h / 4.0f;
+    float scale = xdiv * 0.4f;
+
+    glUniform1f(glGetUniformLocation(as->program, "scale"), scale);
+
+    for (size_t i=0; i < as->shape.size(); i++) {
+        auto &s = as->shape[i];
+
+        s.center = glm::vec2{xoff + (i+1)*xdiv, yoff + ydiv};
 
         glUniform2fv(glGetUniformLocation(as->program, "center"), 1, &s.center[0]);
 
