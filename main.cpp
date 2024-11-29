@@ -14,25 +14,38 @@
 #include <vector>
 #include <cmath>
 #include <array>
+#include <algorithm>
+#include <random>
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
+const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
+const glm::vec4 FILL_COLOR{0.2f, 0.8f, 0.2f, 1.f};
+const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
+
+// Wrapper for GL_TRIANGLES
+struct GLPrimitive {
+    GLuint vbo_vertex;
+    GLuint vbo_index;
+    int index_count;
+    glm::vec4 color;
+    glm::vec2 trans{0.0f, 0.0f};
+    float scale = 1.0f;
+};
+
+struct VertexIndex {
+    std::vector<glm::vec2> vertex;
+    std::vector<uint32_t> index;
+};
 
 struct Shape {
     int sides;
     glm::vec2 center;
     float radius;
     float line_thickness;
-    glm::vec4 line_color;
-    glm::vec4 fill_color;
 
-    GLuint vbo_line_vertex;
-    GLuint vbo_line_index;
-    int line_index_count;
-
-    GLuint vbo_fill_vertex;
-    GLuint vbo_fill_index;
-    int fill_index_count;
+    GLPrimitive line;
+    GLPrimitive fill;
 };
 
 struct AppState {
@@ -45,25 +58,29 @@ struct AppState {
     GLuint program;
     GLuint vao;
 
-    GLuint vbo_bg_vertex;
-    GLuint vbo_bg_index;
-    GLuint bg_index_count;
+    // actual drawing area
+    int xoff, yoff;
+    int w, h;     
+    int xdiv, ydiv;
+
+    GLPrimitive bg;
 
     std::array<Shape, NUM_SHAPES> shape;
+    std::array<int, NUM_SHAPES> shape_order;
 };
 
 static const char *vertex_shader = R"(
 #version 330
 
 layout(location = 0) in vec2 position;
-uniform vec2 center;
+uniform vec2 trans;
 uniform float scale;
 uniform vec4 color;
 uniform mat4 projection_matrix;
 out vec4 v_color;
 
 void main() {
-    gl_Position = projection_matrix * vec4(position*scale + center, 0.0, 1.0);
+    gl_Position = projection_matrix * vec4(position*scale + trans, 0.0, 1.0);
     v_color = color;
 })";
 
@@ -90,13 +107,36 @@ void GLAPIENTRY gl_debug_callback( GLenum source,
             type, severity, message );
 }
 
-Shape create_shape(int sides, float radius, float line_thickness) {
-    Shape shape;
+GLPrimitive make_gl_primitive(const VertexIndex &vi, const glm::vec4 &color) {
+    GLPrimitive ret;
 
-    shape.sides = sides;
-    shape.radius = radius;
-    shape.line_thickness = line_thickness;
+    glGenBuffers(1, &ret.vbo_vertex);
+    glBindBuffer(GL_ARRAY_BUFFER, ret.vbo_vertex);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*vi.vertex.size(), vi.vertex.data(), GL_STATIC_DRAW);
 
+    glGenBuffers(1, &ret.vbo_index);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ret.vbo_index);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*vi.index.size(), vi.index.data(), GL_STATIC_DRAW);
+
+    ret.index_count = vi.index.size();
+    ret.color = color;
+
+    return ret;
+}
+
+void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
+    glUniform1f(glGetUniformLocation(program, "scale"), p.scale);
+    glUniform2fv(glGetUniformLocation(program, "trans"), 1, &p.trans[0]);
+    glUniform4fv(glGetUniformLocation(program, "color"), 1, &p.color[0]);
+
+    glBindBuffer(GL_ARRAY_BUFFER, p.vbo_vertex);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p.vbo_index);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glDrawElements(GL_TRIANGLES, p.index_count, GL_UNSIGNED_INT, 0);
+}
+  
+std::vector<glm::vec2> make_polygon(int sides, float radius) {
     std::vector<glm::vec2> vert;
 
     for (int i=0; i < sides; i++) {
@@ -107,31 +147,10 @@ Shape create_shape(int sides, float radius, float line_thickness) {
         vert.push_back(glm::vec2{x, y});
     }
 
-    // triangles to fill in the shape
-    std::vector<glm::vec2> fill_pts;
-    std::vector<uint32_t> fill_idx;
+    return vert;
+}
 
-    fill_pts = vert;
-    fill_pts.push_back(glm::vec2{0.0f, 0.0f}); // origin of shape
-
-    for (int i=0; i < static_cast<int>(vert.size()); i++) {
-        int j = (i + 1) % vert.size();
-
-        fill_idx.push_back(i);
-        fill_idx.push_back(j);
-        fill_idx.push_back(fill_pts.size() - 1);
-    }
-
-    glGenBuffers(1, &shape.vbo_fill_vertex);
-    glBindBuffer(GL_ARRAY_BUFFER, shape.vbo_fill_vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*fill_pts.size(), fill_pts.data(), GL_STATIC_DRAW);
-
-    glGenBuffers(1, &shape.vbo_fill_index);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shape.vbo_fill_index);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*fill_idx.size(), fill_idx.data(), GL_STATIC_DRAW);
-
-    shape.fill_index_count = fill_idx.size();
-
+VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     // quads for each line
     std::vector<glm::vec2> tri_pts;
     std::vector<uint32_t> tri_idx;
@@ -154,15 +173,15 @@ Shape create_shape(int sides, float radius, float line_thickness) {
         tri_idx.push_back(tri_pts.size() + 2);
         tri_idx.push_back(tri_pts.size() + 3);
 
-        tri_pts.push_back(vert[i] + n*line_thickness*0.5f);
-        tri_pts.push_back(vert[j] + n*line_thickness*0.5f);
-        tri_pts.push_back(vert[j] - n*line_thickness*0.5f);
-        tri_pts.push_back(vert[i] - n*line_thickness*0.5f);
+        tri_pts.push_back(vert[i] + n*thickness*0.5f);
+        tri_pts.push_back(vert[j] + n*thickness*0.5f);
+        tri_pts.push_back(vert[j] - n*thickness*0.5f);
+        tri_pts.push_back(vert[i] - n*thickness*0.5f);
 
-        outer.push_back(vert[i] + n*line_thickness*0.5f);
-        outer.push_back(vert[j] + n*line_thickness*0.5f);
-        inner.push_back(vert[j] - n*line_thickness*0.5f);
-        inner.push_back(vert[i] - n*line_thickness*0.5f);
+        outer.push_back(vert[i] + n*thickness*0.5f);
+        outer.push_back(vert[j] + n*thickness*0.5f);
+        inner.push_back(vert[j] - n*thickness*0.5f);
+        inner.push_back(vert[i] - n*thickness*0.5f);
     }
 
      // miter
@@ -207,15 +226,35 @@ Shape create_shape(int sides, float radius, float line_thickness) {
         }
     }
 
-    glGenBuffers(1, &shape.vbo_line_vertex);
-    glBindBuffer(GL_ARRAY_BUFFER, shape.vbo_line_vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*tri_pts.size(), tri_pts.data(), GL_STATIC_DRAW);
+    return {tri_pts, tri_idx};
+}
 
-    glGenBuffers(1, &shape.vbo_line_index);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shape.vbo_line_index);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*tri_idx.size(), tri_idx.data(), GL_STATIC_DRAW);
+Shape create_shape(int sides, float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+    Shape shape;
 
-    shape.line_index_count = tri_idx.size();
+    shape.sides = sides;
+    shape.radius = radius;
+
+    std::vector<glm::vec2> vert = make_polygon(sides, radius);
+
+    std::vector<glm::vec2> fill_vert;
+    std::vector<uint32_t> fill_idx;
+
+    fill_vert = vert;
+    fill_vert.push_back(glm::vec2{0.0f, 0.0f}); // cener of shape
+
+    for (int i=0; i < static_cast<int>(vert.size()); i++) {
+        int j = (i + 1) % vert.size();
+
+        fill_idx.push_back(i);
+        fill_idx.push_back(j);
+        fill_idx.push_back(fill_vert.size() - 1);
+    }
+
+    shape.fill = make_gl_primitive({fill_vert, fill_idx}, fill_color);
+
+    VertexIndex line = make_line(vert, line_thickness);
+    shape.line = make_gl_primitive(line, line_color);
 
     return shape;
 }
@@ -283,34 +322,95 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     int sides = 3;
     for (auto &s: as->shape) {
-        s = create_shape(sides, 1.f, 0.1f);
-        s.line_color = glm::vec4{1.f, 1.f, 1.f, 1.f};
-        s.fill_color = glm::vec4{0.2f, 0.8f, 0.2f, 1.f};
-
+        s = create_shape(sides, 1.f, 0.1f, LINE_COLOR, FILL_COLOR);
         sides++;
     }
 
-    glGenBuffers(1, &as->vbo_bg_vertex);
-    glBindBuffer(GL_ARRAY_BUFFER, as->vbo_bg_vertex);
-    std::array<glm::vec2, 4> empty;
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*4, empty.data(), GL_DYNAMIC_DRAW);
-
-    glGenBuffers(1, &as->vbo_bg_index);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, as->vbo_bg_index);
+    std::vector<glm::vec2> empty(4);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*index.size(), index.data(), GL_STATIC_DRAW);
-    as->bg_index_count = index.size();
-    
+
+    as->bg = make_gl_primitive({empty, index}, BG_COLOR);
+   
+    for (int i=0; i < NUM_SHAPES; i++) {
+        as->shape_order[i] = i;
+    }
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(as->shape_order.begin(), as->shape_order.end(), g);
+
     return SDL_APP_CONTINUE;
 }
 
+bool recalc_drawing_area(AppState &as) {
+    int win_w, win_h;
+
+    if (!SDL_GetWindowSize(as.window, &win_w, &win_h)) {
+        std::cerr << SDL_GetError() << "\n";
+        return false;
+    }
+
+    if (win_w > win_h) {
+        as.h = win_h;
+        as.w = win_h * ASPECT_RATIO;
+        as.xoff = (win_w - as.w)/2;
+        as.yoff = 0;
+    } else {
+        as.w = win_w;
+        as.h = win_w / ASPECT_RATIO;
+        as.xoff = 0;
+        as.yoff = (win_h - as.h) /2;
+    }
+
+    as.xdiv = as.w*1.f / (NUM_SHAPES + 1);
+    as.ydiv = as.h / 4.0f;
+
+    glViewport(0, 0, win_w, win_h);
+    glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
+    glUniformMatrix4fv(glGetUniformLocation(as.program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+
+    return true;
+}
+
+void update_background(const AppState &as) {
+    std::array<glm::vec2, 4> bg;
+
+    bg[0] = glm::vec2{as.xoff, as.yoff};
+    bg[1] = glm::vec2{as.xoff + as.w, as.yoff};
+    bg[2] = glm::vec2{as.xoff + as.w, as.yoff + as.h};
+    bg[3] = glm::vec2{as.xoff, as.yoff + as.h};
+   
+    glBindBuffer(GL_ARRAY_BUFFER, as.bg.vbo_vertex);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*4, bg.data());
+}
+
+void update_gl_primitives(AppState &as) {
+    float scale = as.xdiv * 0.4f;
+
+    for (auto &s: as.shape) {
+        s.line.scale = scale;
+        s.fill.scale = scale;
+    }
+}
+
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
+    AppState &as = *static_cast<AppState*>(appstate);
+
     switch (event->type) {
         case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
         if (event->key.key == SDLK_ESCAPE) {
             SDL_Quit();
         }
+        break;
+
+        case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_SHOWN:
+        recalc_drawing_area(as);
+        update_background(as);
+        update_gl_primitives(as);
+
+        break;
     }
     
     return SDL_APP_CONTINUE;
@@ -329,89 +429,37 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-    AppState *as = static_cast<AppState*>(appstate);
+    AppState &as = *static_cast<AppState*>(appstate);
 
-    int win_w, win_h;
-    if (!SDL_GetWindowSize(as->window, &win_w, &win_h)) {
-        std::cerr << SDL_GetError() << "\n";
-        return SDL_APP_FAILURE;
-    }
-
-    glViewport(0, 0, win_w, win_h);
-    glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
-
-    glUseProgram(as->program);
-    glUniformMatrix4fv(glGetUniformLocation(as->program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+    glUseProgram(as.program);
 
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glBindVertexArray(as->vao);
+    glBindVertexArray(as.vao);
 
     float cx, cy;
     SDL_GetMouseState(&cx, &cy);
 
-    float w, h, xoff=0, yoff=0;
+    draw_gl_primitive(as.program, as.bg);
 
-    if (win_w > win_h) {
-        h = win_h;
-        w = win_h * ASPECT_RATIO;
-        xoff = (win_w - w)/2;
-    } else {
-        w = win_w;
-        h = win_w / ASPECT_RATIO;
-        yoff = (win_h - h) /2;
+    for (size_t i=0; i < as.shape.size(); i++) {
+        auto &s = as.shape[i];
+
+        s.fill.trans = glm::vec2{as.xoff + (i+1)*as.xdiv, as.yoff + as.ydiv};
+        s.line.trans = glm::vec2{as.xoff + (i+1)*as.xdiv, as.yoff + as.ydiv};
+
+        draw_gl_primitive(as.program, s.fill);
+        draw_gl_primitive(as.program, s.line);
+
+        int idx = as.shape_order[i];
+        s.line.trans = glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv*3};
+        
+        draw_gl_primitive(as.program, s.line);
     }
 
-    std::array<glm::vec2, 4> bg;
-    bg[0] = glm::vec2{xoff, yoff};
-    bg[1] = glm::vec2{xoff + w, yoff};
-    bg[2] = glm::vec2{xoff + w, yoff + h};
-    bg[3] = glm::vec2{xoff, yoff + h};
-   
-    glm::vec2 origin{0.f, 0.f};
-    glm::vec4 color{0.3f, 0.3f, 0.3f, 1.0f};
-    glUniform2fv(glGetUniformLocation(as->program, "center"), 1, &origin[0]);
-    glUniform1f(glGetUniformLocation(as->program, "scale"), 1.0f);
-    glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &color[0]);
-
-    glBindBuffer(GL_ARRAY_BUFFER, as->vbo_bg_vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*4, bg.data());
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, as->vbo_bg_index);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glDrawElements(GL_TRIANGLES, as->bg_index_count, GL_UNSIGNED_INT, 0);
-
-    float xdiv = w*1.f / (NUM_SHAPES + 1);
-    float ydiv = h / 4.0f;
-    float scale = xdiv * 0.4f;
-
-    glUniform1f(glGetUniformLocation(as->program, "scale"), scale);
-
-    for (size_t i=0; i < as->shape.size(); i++) {
-        auto &s = as->shape[i];
-
-        s.center = glm::vec2{xoff + (i+1)*xdiv, yoff + ydiv};
-
-        glUniform2fv(glGetUniformLocation(as->program, "center"), 1, &s.center[0]);
-
-        glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &s.fill_color[0]);
-        glBindBuffer(GL_ARRAY_BUFFER, s.vbo_fill_vertex);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.vbo_fill_index);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-        glDrawElements(GL_TRIANGLES, s.fill_index_count, GL_UNSIGNED_INT, 0);
-  
-        glUniform4fv(glGetUniformLocation(as->program, "color"), 1, &s.line_color[0]);
-        glBindBuffer(GL_ARRAY_BUFFER, s.vbo_line_vertex);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.vbo_line_index);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-        glDrawElements(GL_TRIANGLES, s.line_index_count, GL_UNSIGNED_INT, 0);
-    }
-
-    SDL_GL_SwapWindow(as->window);
+    SDL_GL_SwapWindow(as.window);
 
     return SDL_APP_CONTINUE;
 }
