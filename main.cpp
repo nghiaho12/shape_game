@@ -1,4 +1,4 @@
-#define SDL_MAIN_USE_CALLBACKS 1 // use the callbacks instead of main() 
+#define SDL_MAIN_USE_CALLBACKS // use the callbacks instead of main() 
 #define GL_GLEXT_PROTOTYPES
 
 #include <SDL3/SDL.h>
@@ -101,14 +101,15 @@ void main() {
     o_color = v_color;
 })";
 
-void GLAPIENTRY gl_debug_callback( GLenum source,
-                 GLenum type,
-                 GLuint id,
-                 GLenum severity,
-                 GLsizei length,
-                 const GLchar* message,
-                 const void* userParam )
-{
+void GLAPIENTRY gl_debug_callback( 
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam) {
+
     fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
            ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
             type, severity, message );
@@ -329,11 +330,20 @@ std::vector<Shape> create_shape_set() {
     return ret;
 }
 
-void init_shape(AppState &as) {
+void update_gl_primitives(AppState &as) {
+    float scale = as.xdiv * 0.4f;
+
+    for (auto &s: as.shape) {
+        s.line.scale = scale;
+        s.fill.scale = scale;
+    }
+}
+
+void init_game(AppState &as) {
     std::random_device rd;
     std::mt19937 g(rd());
 
-    for (auto &s : as.all_shape) {
+    for (auto &s: as.all_shape) {
         free_gl_primitive(s.line);
         free_gl_primitive(s.fill);
     }
@@ -347,6 +357,12 @@ void init_shape(AppState &as) {
     }
 
     std::shuffle(as.shape_dst.begin(), as.shape_dst.end(), g);
+
+    for (auto &b : as.shape_done) {
+        b = false;
+    }
+
+    update_gl_primitives(as);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -415,7 +431,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     as->bg = make_gl_primitive({empty, index}, BG_COLOR);
 
-    init_shape(*as);
+    init_game(*as);
 
     return SDL_APP_CONTINUE;
 }
@@ -462,15 +478,6 @@ void update_background(const AppState &as) {
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*4, bg.data());
 }
 
-void update_gl_primitives(AppState &as) {
-    float scale = as.xdiv * 0.4f;
-
-    for (auto &s: as.shape) {
-        s.line.scale = scale;
-        s.fill.scale = scale;
-    }
-}
-
 glm::vec2 shape_index_to_src_pos(const AppState &as, int idx) {
     return glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv};
 }
@@ -515,6 +522,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
         case SDL_EVENT_KEY_DOWN:
             if (event->key.key == SDLK_ESCAPE) {
                 SDL_Quit();
+                return SDL_APP_SUCCESS;
             }
             break;
 
@@ -538,6 +546,18 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             }
 
             as.selected_shape = -1;
+
+            int done = 0;
+            for (auto a: as.shape_done) {
+                if (a) {
+                    done++;
+                }
+            }
+
+            if (done == NUM_SHAPES) {
+                init_game(as);
+            }
+
             break;
     }
     
