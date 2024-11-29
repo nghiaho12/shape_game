@@ -38,6 +38,8 @@ struct VertexIndex {
     std::vector<uint32_t> index;
 };
 
+enum class ShapeType {POLYGON, STAR};
+
 struct Shape {
     int sides;
     glm::vec2 center;
@@ -67,9 +69,10 @@ struct AppState {
 
     GLPrimitive bg;
 
+    std::vector<Shape> all_shape;
     int selected_shape = -1;
     std::array<Shape, NUM_SHAPES> shape;
-    std::array<int, NUM_SHAPES> shape_order;
+    std::array<int, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
 };
 
@@ -128,6 +131,18 @@ GLPrimitive make_gl_primitive(const VertexIndex &vi, const glm::vec4 &color) {
     return ret;
 }
 
+void free_gl_primitive(GLPrimitive &p) {
+    if (p.vbo_vertex) {
+        glDeleteBuffers(1, &p.vbo_vertex);
+        p.vbo_vertex = 0;
+    }
+
+    if (p.vbo_index) {
+        glDeleteBuffers(1, &p.vbo_index);
+        p.vbo_index= 0;
+    }
+}
+
 void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
     glUniform1f(glGetUniformLocation(program, "scale"), p.scale);
     glUniform2fv(glGetUniformLocation(program, "trans"), 1, &p.trans[0]);
@@ -140,11 +155,11 @@ void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
     glDrawElements(GL_TRIANGLES, p.index_count, GL_UNSIGNED_INT, 0);
 }
   
-std::vector<glm::vec2> make_polygon(int sides, float radius) {
+std::vector<glm::vec2> make_polygon(int sides, float radius, float theta_offset=0.0f) {
     std::vector<glm::vec2> vert;
 
     for (int i=0; i < sides; i++) {
-        float theta = i * 2*M_PI / sides;
+        float theta = i * 2*M_PI / sides + theta_offset;
         float x = radius*std::cos(theta);
         float y = radius*std::sin(theta);
 
@@ -152,6 +167,47 @@ std::vector<glm::vec2> make_polygon(int sides, float radius) {
     }
 
     return vert;
+}
+
+std::vector<glm::vec2> make_star(int sides, float radius, float theta_offset=0.0f) {
+    std::vector<glm::vec2> vert;
+
+    for (int i=0; i < sides*2; i++) {
+        float theta = i * 2*M_PI / (sides*2) + theta_offset;
+
+        float r;
+
+        if (i & 1) {
+            r = radius;
+        } else {
+            r = radius*0.5f;
+        }
+
+        float x = r*std::cos(theta);
+        float y = r*std::sin(theta);
+
+        vert.push_back(glm::vec2{x, y});
+    }
+
+    return vert;
+}
+
+VertexIndex make_fill(const std::vector<glm::vec2> &vert) {
+    std::vector<glm::vec2> fill_vert;
+    std::vector<uint32_t> fill_idx;
+
+    fill_vert = vert;
+    fill_vert.push_back(glm::vec2{0.0f, 0.0f}); // cener of shape
+
+    for (int i=0; i < static_cast<int>(vert.size()); i++) {
+        int j = (i + 1) % vert.size();
+
+        fill_idx.push_back(i);
+        fill_idx.push_back(j);
+        fill_idx.push_back(fill_vert.size() - 1);
+    }
+
+    return {fill_vert, fill_idx};
 }
 
 VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
@@ -233,34 +289,64 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     return {tri_pts, tri_idx};
 }
 
-Shape create_shape(int sides, float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+Shape create_shape(ShapeType type, int sides, float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color, float theta_offset=0.0f) {
     Shape shape;
 
-    shape.sides = sides;
     shape.radius = radius;
 
-    std::vector<glm::vec2> vert = make_polygon(sides, radius);
+    std::vector<glm::vec2> vert;
 
-    std::vector<glm::vec2> fill_vert;
-    std::vector<uint32_t> fill_idx;
-
-    fill_vert = vert;
-    fill_vert.push_back(glm::vec2{0.0f, 0.0f}); // cener of shape
-
-    for (int i=0; i < static_cast<int>(vert.size()); i++) {
-        int j = (i + 1) % vert.size();
-
-        fill_idx.push_back(i);
-        fill_idx.push_back(j);
-        fill_idx.push_back(fill_vert.size() - 1);
+    if (type == ShapeType::POLYGON) {
+        vert = make_polygon(sides, radius, theta_offset);
+    } else {
+        vert = make_star(sides, radius, theta_offset);
     }
 
-    shape.fill = make_gl_primitive({fill_vert, fill_idx}, fill_color);
-
-    VertexIndex line = make_line(vert, line_thickness);
-    shape.line = make_gl_primitive(line, line_color);
+    shape.fill = make_gl_primitive(make_fill(vert), fill_color);
+    shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
 
     return shape;
+}
+
+std::vector<Shape> create_shape_set() {
+    std::vector<Shape> ret;
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::uniform_real_distribution<double> dice(0.0, 2*M_PI);
+
+    for (int sides=3; sides <= 6; sides++) {
+        Shape s = create_shape( ShapeType::POLYGON, sides, 1.f, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
+        ret.push_back(s);
+    }
+
+    Shape circle = create_shape(ShapeType::POLYGON, 36, 1.f, 0.1f, LINE_COLOR, FILL_COLOR);
+    ret.push_back(circle);
+
+    Shape star = create_shape(ShapeType::STAR, 5, 1.f, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
+    ret.push_back(star);
+
+    return ret;
+}
+
+void init_shape(AppState &as) {
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    for (auto &s : as.all_shape) {
+        free_gl_primitive(s.line);
+        free_gl_primitive(s.fill);
+    }
+
+    as.all_shape = create_shape_set();
+    std::shuffle(as.all_shape.begin(), as.all_shape.end(), g);
+
+    for (int i=0; i < NUM_SHAPES; i++) {
+        as.shape[i] = as.all_shape[i];
+        as.shape_dst[i] = i;
+    }
+
+    std::shuffle(as.shape_dst.begin(), as.shape_dst.end(), g);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -324,24 +410,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     glGenVertexArrays(1, &as->vao);
     glBindVertexArray(as->vao);
 
-    int sides = 3;
-    for (auto &s: as->shape) {
-        s = create_shape(sides, 1.f, 0.1f, LINE_COLOR, FILL_COLOR);
-        sides++;
-    }
-
+    // background
     std::vector<glm::vec2> empty(4);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
-
     as->bg = make_gl_primitive({empty, index}, BG_COLOR);
-   
-    for (int i=0; i < NUM_SHAPES; i++) {
-        as->shape_order[i] = i;
-    }
 
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(as->shape_order.begin(), as->shape_order.end(), g);
+    init_shape(*as);
 
     return SDL_APP_CONTINUE;
 }
@@ -458,7 +532,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             if (as.selected_shape != -1) {
                 int dst_idx = find_selected_shape(as, true);
 
-                if (as.shape_order[as.selected_shape] == dst_idx) {
+                if (as.shape_dst[as.selected_shape] == dst_idx) {
                     as.shape_done[as.selected_shape] = true;
                 }
             }
@@ -507,7 +581,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = as.shape[i];
-        int idx = as.shape_order[i];
+        int idx = as.shape_dst[i];
 
         if (as.shape_done[i]) {
             s.line.trans = shape_index_to_dst_pos(as, idx);
