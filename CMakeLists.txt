@@ -10,6 +10,9 @@ if (CMAKE_SYSTEM_NAME MATCHES Emscripten)
     set(CMAKE_CXX_FLAGS "-sFULL_ES3")
 endif()
 
-add_executable(main main.cpp)
+add_executable(main 
+    src/main.cpp
+    src/geometry.cpp
+)
 
 target_link_libraries(main PRIVATE SDL3::SDL3 ${OPENGL_LIBRARIES})
