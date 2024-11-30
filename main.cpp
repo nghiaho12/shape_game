@@ -17,6 +17,11 @@
 #include <algorithm>
 #include <random>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
@@ -37,6 +42,7 @@ struct VertexIndex {
     std::vector<glm::vec2> vertex;
     std::vector<uint32_t> index;
 };
+
 
 struct Shape {
     int sides;
@@ -355,13 +361,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     AppState *as = new AppState();
     
     if (!as) {
+        std::cerr << "can't alloc memory for AppState\n";
         return SDL_APP_FAILURE;
     }
 
     *appstate = as;
 
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
-        return SDL_APP_FAILURE;
+        std::cerr << "SDL_CreateWindowAndRenderer failed\n";
     }    
 
     // glEnable(GL_DEBUG_OUTPUT);
@@ -431,7 +438,9 @@ bool recalc_drawing_area(AppState &as) {
         return false;
     }
 
-    std::cout << win_w << " " << win_h << "\n";
+#ifdef __EMSCRIPTEN__
+    emscripten_set_canvas_element_size("#canvas", win_w, win_h);
+#endif
 
     if (win_w > win_h) {
         as.h = win_h;
