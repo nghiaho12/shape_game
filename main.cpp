@@ -45,7 +45,6 @@ struct VertexIndex {
 
 
 struct Shape {
-    int sides;
     glm::vec2 center;
     float radius;
     float line_thickness;
