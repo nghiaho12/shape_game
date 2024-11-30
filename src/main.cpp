@@ -49,25 +49,30 @@ struct AppState {
 
     GLPrimitive bg;
 
-    std::vector<Shape> all_shape;
-    int selected_shape = -1;
+    std::vector<Shape> shape_set;
     std::array<Shape, NUM_SHAPES> shape;
     std::array<int, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
+    int selected_shape = -1;
 };
 
 static const char *vertex_shader = R"(#version 300 es
 precision mediump float;
 
 layout(location = 0) in vec2 position;
-uniform vec2 trans;
 uniform float scale;
+uniform float theta;
+uniform vec2 trans;
 uniform vec4 color;
 uniform mat4 projection_matrix;
 out vec4 v_color;
 
 void main() {
-    gl_Position = projection_matrix * vec4(position*scale + trans, 0.0, 1.0);
+    float c = cos(theta);
+    float s = sin(theta);
+    mat2 R = mat2(c, s, -s, c);
+
+    gl_Position = projection_matrix * vec4(R*position*scale + trans, 0.0, 1.0);
     v_color = color;
 })";
 
@@ -107,20 +112,23 @@ void update_gl_primitives(AppState &as) {
 void init_game(AppState &as) {
     std::random_device rd;
     std::mt19937 g(rd());
+    std::uniform_real_distribution<float> dice(0.0, 2*M_PI);
 
-    for (auto &s: as.all_shape) {
-        free_gl_primitive(s.line);
-        free_gl_primitive(s.fill);
-    }
-
-    as.all_shape = make_shape_set(LINE_COLOR, FILL_COLOR);
-    std::shuffle(as.all_shape.begin(), as.all_shape.end(), g);
+    // Randomly pick NUM_SHAPE from all the shape set
+    std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
 
     for (int i=0; i < NUM_SHAPES; i++) {
-        as.shape[i] = as.all_shape[i];
+        as.shape[i] = as.shape_set[i];
+
+        // Randomly rotate the shape
+        float theta = dice(g);
+        as.shape[i].line.theta = theta;
+        as.shape[i].fill.theta = theta;
+
         as.shape_dst[i] = i;
     }
 
+    // Randomly assign the shape dest position
     std::shuffle(as.shape_dst.begin(), as.shape_dst.end(), g);
 
     for (auto &b : as.shape_done) {
@@ -134,14 +142,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    // SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-    // SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES); 
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 
     AppState *as = new AppState();
     
@@ -210,6 +213,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     as->bg = make_gl_primitive({empty, index}, BG_COLOR);
 
+    as->shape_set = make_shape_set(LINE_COLOR, FILL_COLOR);
     init_game(*as);
 
     return SDL_APP_CONTINUE;
@@ -350,11 +354,18 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     if (appstate) {
-        AppState *as = static_cast<AppState*>(appstate);
-        SDL_DestroyRenderer(as->renderer);
-        SDL_DestroyWindow(as->window);
+        AppState &as = *static_cast<AppState*>(appstate);
+        SDL_DestroyRenderer(as.renderer);
+        SDL_DestroyWindow(as.window);
 
-        delete as;
+        for (auto &s: as.shape_set) {
+            free_gl_primitive(s.line);
+            free_gl_primitive(s.fill);
+        }
+
+        glDeleteVertexArraysOES(1, &as.vao);
+
+        delete &as;
     }
 }
 

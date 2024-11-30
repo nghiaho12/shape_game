@@ -13,6 +13,7 @@ struct GLPrimitive {
     glm::vec4 color;
     glm::vec2 trans{0.0f, 0.0f};
     float scale = 1.0f;
+    float theta = 0.0f; // rotation in radians
 };
 
 struct Shape {
