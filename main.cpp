@@ -3,7 +3,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-#include <SDL3/SDL_opengl.h>
+#include <SDL3/SDL_opengles2.h>
 
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -37,8 +37,6 @@ struct VertexIndex {
     std::vector<glm::vec2> vertex;
     std::vector<uint32_t> index;
 };
-
-enum class ShapeType {POLYGON, STAR};
 
 struct Shape {
     int sides;
@@ -76,8 +74,8 @@ struct AppState {
     std::array<bool, NUM_SHAPES> shape_done;
 };
 
-static const char *vertex_shader = R"(
-#version 330
+static const char *vertex_shader = R"(#version 300 es
+precision mediump float;
 
 layout(location = 0) in vec2 position;
 uniform vec2 trans;
@@ -91,8 +89,8 @@ void main() {
     v_color = color;
 })";
 
-static const char *fragment_shader = R"(
-#version 330
+static const char *fragment_shader = R"(#version 300 es
+precision mediump float;
 
 in vec4 v_color;
 out vec4 o_color;
@@ -101,19 +99,19 @@ void main() {
     o_color = v_color;
 })";
 
-void GLAPIENTRY gl_debug_callback( 
-    GLenum source,
-    GLenum type,
-    GLuint id,
-    GLenum severity,
-    GLsizei length,
-    const GLchar* message,
-    const void* userParam) {
-
-    fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-           ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
-            type, severity, message );
-}
+// void GLAPIENTRY gl_debug_callback( 
+//     GLenum source,
+//     GLenum type,
+//     GLuint id,
+//     GLenum severity,
+//     GLsizei length,
+//     const GLchar* message,
+//     const void* userParam) {
+//
+//     fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+//            ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
+//             type, severity, message );
+// }
 
 GLPrimitive make_gl_primitive(const VertexIndex &vi, const glm::vec4 &color) {
     GLPrimitive ret;
@@ -156,34 +154,13 @@ void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
     glDrawElements(GL_TRIANGLES, p.index_count, GL_UNSIGNED_INT, 0);
 }
   
-std::vector<glm::vec2> make_polygon(int sides, float radius, float theta_offset=0.0f) {
+std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius, float theta_offset=0.0f) {
     std::vector<glm::vec2> vert;
 
     for (int i=0; i < sides; i++) {
         float theta = i * 2*M_PI / sides + theta_offset;
-        float x = radius*std::cos(theta);
-        float y = radius*std::sin(theta);
 
-        vert.push_back(glm::vec2{x, y});
-    }
-
-    return vert;
-}
-
-std::vector<glm::vec2> make_star(int sides, float radius, float theta_offset=0.0f) {
-    std::vector<glm::vec2> vert;
-
-    for (int i=0; i < sides*2; i++) {
-        float theta = i * 2*M_PI / (sides*2) + theta_offset;
-
-        float r;
-
-        if (i & 1) {
-            r = radius;
-        } else {
-            r = radius*0.5f;
-        }
-
+        float r = radius[(i % radius.size())];
         float x = r*std::cos(theta);
         float y = r*std::sin(theta);
 
@@ -290,18 +267,12 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     return {tri_pts, tri_idx};
 }
 
-Shape create_shape(ShapeType type, int sides, float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color, float theta_offset=0.0f) {
+Shape create_shape( int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color, float theta_offset=0.0f) {
     Shape shape;
 
-    shape.radius = radius;
+    shape.radius = *std::max_element(radius.begin(), radius.end());
 
-    std::vector<glm::vec2> vert;
-
-    if (type == ShapeType::POLYGON) {
-        vert = make_polygon(sides, radius, theta_offset);
-    } else {
-        vert = make_star(sides, radius, theta_offset);
-    }
+    std::vector<glm::vec2> vert = make_polygon(sides, radius, theta_offset);
 
     shape.fill = make_gl_primitive(make_fill(vert), fill_color);
     shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
@@ -317,15 +288,18 @@ std::vector<Shape> create_shape_set() {
     std::uniform_real_distribution<double> dice(0.0, 2*M_PI);
 
     for (int sides=3; sides <= 6; sides++) {
-        Shape s = create_shape( ShapeType::POLYGON, sides, 1.f, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
+        Shape s = create_shape(sides, {1.f}, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
         ret.push_back(s);
     }
 
-    Shape circle = create_shape(ShapeType::POLYGON, 36, 1.f, 0.1f, LINE_COLOR, FILL_COLOR);
+    Shape circle = create_shape(36, {1.f}, 0.1f, LINE_COLOR, FILL_COLOR);
     ret.push_back(circle);
 
-    Shape star = create_shape(ShapeType::STAR, 5, 1.f, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
+    Shape star = create_shape(10, {1.0f, 0.5f}, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
     ret.push_back(star);
+
+    Shape rhombus = create_shape(4, {1.0f, 0.5f}, 0.1f, LINE_COLOR, FILL_COLOR, dice(g));
+    ret.push_back(rhombus);
 
     return ret;
 }
@@ -369,14 +343,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+    // SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+    // SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    // SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    // SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    // SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    // SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES); 
 
     AppState *as = new AppState();
     
@@ -386,13 +360,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     *appstate = as;
 
-    if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
+    if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
         return SDL_APP_FAILURE;
     }    
 
-    glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(gl_debug_callback, 0);
-    glDisable(GL_CULL_FACE);
+    // glEnable(GL_DEBUG_OUTPUT);
+    // glDebugMessageCallback(gl_debug_callback, 0);
 
     as->v_shader = glCreateShader(GL_VERTEX_SHADER);
     as->f_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -404,6 +377,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     GLint status;
     glGetShaderiv(as->v_shader, GL_COMPILE_STATUS, &status);
     if (status == GL_FALSE) {
+        GLint maxLength = 0;
+        glGetShaderiv(as->v_shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+        std::vector<GLchar> errorLog(maxLength);
+        glGetShaderInfoLog(as->v_shader, maxLength, &maxLength, &errorLog[0]);
+
+        std::cout << std::string(errorLog.data()) << "\n";
         std::cerr << "vertex shader compilation failed\n";
         return SDL_APP_FAILURE;
     }
@@ -414,6 +394,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     glGetShaderiv(as->f_shader, GL_COMPILE_STATUS, &status);
     if (status == GL_FALSE) {
+        GLint maxLength = 0;
+        glGetShaderiv(as->f_shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+        std::vector<GLchar> errorLog(maxLength);
+        glGetShaderInfoLog(as->f_shader, maxLength, &maxLength, &errorLog[0]);
+
+        std::cout << std::string(errorLog.data()) << "\n";
         std::cerr << "fragment shader compilation failed\n";
         return SDL_APP_FAILURE;
     }
@@ -423,8 +410,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     glAttachShader(as->program, as->f_shader);
     glLinkProgram(as->program);
 
-    glGenVertexArrays(1, &as->vao);
-    glBindVertexArray(as->vao);
+    glGenVertexArraysOES(1, &as->vao);
+    glBindVertexArrayOES(as->vao);
 
     // background
     std::vector<glm::vec2> empty(4);
@@ -443,6 +430,8 @@ bool recalc_drawing_area(AppState &as) {
         std::cerr << SDL_GetError() << "\n";
         return false;
     }
+
+    std::cout << win_w << " " << win_h << "\n";
 
     if (win_w > win_h) {
         as.h = win_h;
@@ -592,7 +581,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glBindVertexArray(as.vao);
+    glBindVertexArrayOES(as.vao);
 
     float cx, cy;
     SDL_GetMouseState(&cx, &cy);
