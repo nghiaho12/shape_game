@@ -176,21 +176,39 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const glm::vec4 &
 
     std::random_device rd;
     std::mt19937 g(rd());
-    std::uniform_real_distribution<double> dice(0.0, 2*M_PI);
+    std::uniform_real_distribution<float> dice_theta(0.0, 2*M_PI);
+    std::uniform_real_distribution<float> dice_radius(0.4, 1.0);
 
     for (int sides=3; sides <= 6; sides++) {
-        Shape s = make_shape(sides, {1.f}, 0.1f, line_color, fill_color, dice(g));
+        Shape s = make_shape(sides, {1.f}, 0.1f, line_color, fill_color, dice_theta(g));
         ret.push_back(s);
     }
+
 
     Shape circle = make_shape(36, {1.f}, 0.1f, line_color, fill_color);
     ret.push_back(circle);
 
-    Shape star = make_shape(10, {1.0f, 0.5f}, 0.1f, line_color, fill_color, dice(g));
+    Shape star = make_shape(10, {1.0f, 0.5f}, 0.1f, line_color, fill_color, dice_theta(g));
     ret.push_back(star);
 
-    Shape rhombus = make_shape(4, {1.0f, 0.5f}, 0.1f, line_color, fill_color, dice(g));
+    Shape rhombus = make_shape(4, {1.0f, 0.5f}, 0.1f, line_color, fill_color, dice_theta(g));
     ret.push_back(rhombus);
+
+    // add in some irregular shapes
+    int sides = 6;
+    int num_irregulars = 4;
+
+    for (int i=0; i < num_irregulars; i++) {
+        std::vector<float> radius;
+        radius.push_back(1.0f);
+
+        for (int j=1; j < sides; j++) {
+            radius.push_back(dice_radius(g));
+        }
+
+        Shape s = make_shape(5, radius, 0.1f, line_color, fill_color, dice_theta(g));
+        ret.push_back(s);
+    }
 
     return ret;
 }
