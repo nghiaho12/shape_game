@@ -158,7 +158,7 @@ void init_game(AppState &as) {
         } else {
             as.shape[i].rotation_direction = -1;
         }
-        }
+    }
 
     // Randomly assign the shape dest position
     std::shuffle(as.shape_dst.begin(), as.shape_dst.end(), g);
