@@ -144,7 +144,7 @@ void update_gl_primitives(AppState &as) {
 void init_game(AppState &as) {
     std::random_device rd;
     std::mt19937 g(rd());
-    std::uniform_int_distribution<int> dice_binary(-1, 1);
+    std::uniform_real_distribution<float> dice_binary(0, 1);
 
     // Randomly pick NUM_SHAPE from all the shape set
     std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
@@ -153,7 +153,7 @@ void init_game(AppState &as) {
         as.shape[i] = as.shape_set[i];
         as.shape_dst[i] = i;
 
-        if (dice_binary(g) > 0) {
+        if (dice_binary(g) > 0.5) {
             as.shape[i].rotation_direction = 1;
         } else {
             as.shape[i].rotation_direction = -1;
@@ -348,10 +348,12 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     switch (event->type) {
         case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
+#ifndef __EMSCRIPTEN__
             if (event->key.key == SDLK_ESCAPE) {
                 SDL_Quit();
                 return SDL_APP_SUCCESS;
             }
+#endif
             break;
 
         case SDL_EVENT_WINDOW_RESIZED:
