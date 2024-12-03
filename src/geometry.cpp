@@ -168,6 +168,7 @@ Shape make_shape(int sides, const std::vector<float> &radius, float line_thickne
 
     shape.fill = make_gl_primitive(make_fill(vert), fill_color);
     shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
+    shape.line_highlight = make_gl_primitive(make_line(vert, line_thickness*2), line_color);
 
     return shape;
 }
@@ -191,11 +192,14 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
 
     shape.fill = make_gl_primitive(make_fill(vert), fill_color);
     shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
+    shape.line_highlight = make_gl_primitive(make_line(vert, line_thickness*2), line_color);
 
     return shape;
 }
 
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
+    constexpr float line_thickness = 0.1f;
+
     std::vector<Shape> ret;
 
     std::random_device rd;
@@ -212,23 +216,25 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     };
 
     for (int sides=3; sides <= 8; sides++) {
-        Shape s = make_shape(sides, {1.f}, 0.1f, line_color, next_Color());
+        Shape s = make_shape(sides, {1.f}, line_thickness, line_color, next_Color());
         ret.push_back(s);
     }
 
-    Shape circle = make_shape(36, {1.f}, 0.1f, line_color, next_Color());
+    Shape circle = make_shape(36, {1.f}, line_thickness, line_color, next_Color());
     ret.push_back(circle);
 
-    Shape oval = make_oval(1.f, 0.1f, line_color, next_Color());
+    Shape oval = make_oval(1.f, line_thickness, line_color, next_Color());
     ret.push_back(oval);
 
-    Shape star = make_shape(10, {1.0f, 0.5f}, 0.1f, line_color, next_Color());
-    ret.push_back(star);
+    for (int i=0; i < 3; i++) {
+        Shape star = make_shape(8 + i*2, {1.0f, 0.5f}, line_thickness, line_color, next_Color());
+        ret.push_back(star);
+    }
 
-    Shape rhombus = make_shape(4, {1.0f, 0.5f}, 0.1f, line_color, next_Color());
+    Shape rhombus = make_shape(4, {1.0f, 0.5f}, line_thickness, line_color, next_Color());
     ret.push_back(rhombus);
 
-    Shape crystal = make_shape(5, {1.0f, 0.5f, 0.5f, 0.5f, 0.5f}, 0.1f, line_color, next_Color());
+    Shape crystal = make_shape(5, {1.0f, 0.5f, 0.5f, 0.5f, 0.5f}, line_thickness, line_color, next_Color());
     ret.push_back(crystal);
 
     return ret;

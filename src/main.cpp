@@ -33,18 +33,31 @@ const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
 constexpr float SHAPE_ROTATION_SPEED = M_PI_2;
 
 std::map<std::string, glm::vec4> tableau10_palette() {
-   return {
-        {"blue", {0x57/255.f, 0x78/255.f, 0xa4/255.f, 1.f}},
-        {"orange", {0xe4/255.f, 0x94/255.f, 0x44/255.f, 1.f}},
-        {"red", {0xd1/255.f, 0x61/255.f, 0x5d/255.f, 1.f}},
-        {"teal", {0x85/255.f, 0xb6/255.f, 0xb2/255.f, 1.f}},
-        {"green", {0x6a/255.f, 0x9f/255.f, 0x58/255.f, 1.f}},
-        {"yellow", {0xe7/255.f, 0xca/255.f, 0x60/255.f, 1.f}},
-        {"purple", {0xa8/255.f, 0x7c/255.f, 0x9f/255.f, 1.f}},
-        {"pink", {0xf1/255.f, 0xa2/255.f, 0xa9/255.f, 1.f}},
-        {"brown", {0x96/255.f, 0x76/255.f, 0x62/255.f, 1.f}},
-        {"grey", {0xb8/255.f, 0xb0/255.f, 0xac/255.f, 1.f}}
+    const std::map<std::string, uint32_t> color{
+        {"blue", 0x5778a4},
+        {"orange", 0xe49444},
+        {"red", 0xd1615d},
+        {"teal", 0x85b6b2},
+        {"green", 0x6a9f58},
+        {"yellow", 0xe7ca60},
+        {"purple", 0xa87c9f},
+        {"pink", 0xf1a2a9},
+        {"brown", 0x967662},
+        {"grey", 0xb8b0ac},
     };
+
+    std::map<std::string, glm::vec4> ret;
+
+    for (auto it: color) {
+        uint32_t c = it.second;
+        uint8_t r = c >> 16;
+        uint8_t g = c >> 8 & 0xff;
+        uint8_t b = c & 0xff;
+
+        ret[it.first] = {r/255.f, g/255.f, b/255.f, 1.0f};
+    }
+
+    return ret;
 }
 
 struct AppState {
@@ -71,6 +84,7 @@ struct AppState {
     std::array<int, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
     int selected_shape = -1;
+    int highlight_dst = -1;
 
     uint64_t last_tick = 0;
 };
@@ -124,6 +138,7 @@ void update_gl_primitives(AppState &as) {
 
     for (auto &s: as.shape) {
         s.line.scale = scale;
+        s.line_highlight.scale = scale;
         s.fill.scale = scale;
     }
 }
@@ -348,10 +363,15 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             as.selected_shape = find_selected_shape(as, false);
             break;
 
+        case SDL_EVENT_MOUSE_MOTION:
+            as.highlight_dst = find_selected_shape(as, true);
+            break;
+
         case SDL_EVENT_MOUSE_BUTTON_UP:
             if (as.selected_shape != -1) {
                 int dst_idx = find_selected_shape(as, true);
 
+                as.highlight_dst = dst_idx;
                 if (as.shape_dst[as.selected_shape] == dst_idx) {
                     as.shape_done[as.selected_shape] = true;
                 }
@@ -423,10 +443,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = as.shape[i];
-        int idx = as.shape_dst[i];
+        int dst_idx = as.shape_dst[i];
 
         if (as.shape_done[i]) {
-            s.line.trans = shape_index_to_dst_pos(as, idx);
+            s.line.trans = shape_index_to_dst_pos(as, dst_idx);
             s.fill.trans = s.line.trans;
             
             draw_gl_primitive(as.program, s.fill);
@@ -447,15 +467,20 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 theta = 0.f;
             }
 
-            s.line.theta += SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
-            s.fill.theta += SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
+            s.line.theta = theta;
+            s.line_highlight.theta = theta;
+            s.fill.theta = theta;
 
             draw_gl_primitive(as.program, s.fill);
             draw_gl_primitive(as.program, s.line);
 
-            s.line.trans = shape_index_to_dst_pos(as, idx);
-            
-            draw_gl_primitive(as.program, s.line);
+            if (as.highlight_dst == dst_idx) {
+                s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
+                draw_gl_primitive(as.program, s.line_highlight);
+            } else {
+                s.line.trans = shape_index_to_dst_pos(as, dst_idx);
+                draw_gl_primitive(as.program, s.line);
+            }
         }
     }
 
