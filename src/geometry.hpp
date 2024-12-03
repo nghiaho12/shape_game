@@ -24,16 +24,31 @@ struct GLPrimitive {
     float theta = 0.0f; // rotation in radians
 };
 
-// High level shape description
 struct Shape {
-    glm::vec2 center;
     float radius;
-    float line_thickness;
     int rotation_direction = 1;
 
     GLPrimitive line;
     GLPrimitive line_highlight;
     GLPrimitive fill;
+
+    void set_trans(const glm::vec2 &trans) {
+        line.trans = trans;
+        line_highlight.trans = trans;
+        fill.trans = trans;
+    }
+
+    void set_scale(float scale) {
+        line.scale = scale;
+        line_highlight.scale = scale;
+        fill.scale = scale;
+    }
+
+    void set_theta(float theta) {
+        line.theta = theta;
+        line_highlight.theta = theta;
+        fill.theta = theta;
+    }
 };
 
 // Low level functions to create polygon vertex and index.

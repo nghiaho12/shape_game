@@ -137,9 +137,7 @@ void update_gl_primitives(AppState &as) {
     float scale = as.xdiv * 0.4f;
 
     for (auto &s: as.shape) {
-        s.line.scale = scale;
-        s.line_highlight.scale = scale;
-        s.fill.scale = scale;
+        s.set_scale(scale);
     }
 }
 
@@ -168,6 +166,9 @@ void init_game(AppState &as) {
     for (auto &b : as.shape_done) {
         b = false;
     }
+
+    as.selected_shape = -1;
+    as.highlight_dst = -1;
 
     update_gl_primitives(as);
 }
@@ -364,7 +365,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             break;
 
         case SDL_EVENT_MOUSE_MOTION:
-            as.highlight_dst = find_selected_shape(as, true);
+            if (event->motion.state) {
+                as.highlight_dst = find_selected_shape(as, true);
+            }
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -446,19 +449,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         int dst_idx = as.shape_dst[i];
 
         if (as.shape_done[i]) {
-            s.line.trans = shape_index_to_dst_pos(as, dst_idx);
-            s.fill.trans = s.line.trans;
+            s.set_trans(shape_index_to_dst_pos(as, dst_idx));
             
             draw_gl_primitive(as.program, s.fill);
             draw_gl_primitive(as.program, s.line);
         } else {
             if (i == as.selected_shape) {
-                s.fill.trans = glm::vec2{cx, cy};
+                s.set_trans(glm::vec2{cx, cy});
             } else {
-                s.fill.trans = shape_index_to_src_pos(as, i);
+                s.set_trans(shape_index_to_src_pos(as, i));
             }
-
-            s.line.trans = s.fill.trans;
 
             float theta = s.line.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
             if (theta < 0) {
@@ -467,13 +467,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 theta = 0.f;
             }
 
-            s.line.theta = theta;
-            s.line_highlight.theta = theta;
-            s.fill.theta = theta;
+            s.set_theta(theta);
 
             draw_gl_primitive(as.program, s.fill);
             draw_gl_primitive(as.program, s.line);
 
+            // destination shape
             if (as.highlight_dst == dst_idx) {
                 s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
                 draw_gl_primitive(as.program, s.line_highlight);
