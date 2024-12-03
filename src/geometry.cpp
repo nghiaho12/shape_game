@@ -4,11 +4,11 @@
 #include <algorithm>
 #include <random>
 
-std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius, float theta_offset) {
+std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius) {
     std::vector<glm::vec2> vert;
 
     for (int i=0; i < sides; i++) {
-        float theta = i * 2*M_PI / sides + theta_offset;
+        float theta = i * 2*M_PI / sides;
 
         float r = radius[(i % radius.size())];
         float x = r*std::cos(theta);
@@ -148,6 +148,7 @@ void free_gl_primitive(GLPrimitive &p) {
 
 void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
     glUniform1f(glGetUniformLocation(program, "scale"), p.scale);
+    glUniform1f(glGetUniformLocation(program, "theta"), p.theta);
     glUniform2fv(glGetUniformLocation(program, "trans"), 1, &p.trans[0]);
     glUniform4fv(glGetUniformLocation(program, "color"), 1, &p.color[0]);
 
@@ -158,12 +159,12 @@ void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
     glDrawElements(GL_TRIANGLES, p.index_count, GL_UNSIGNED_INT, 0);
 }
   
-Shape make_shape( int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color, float theta_offset) {
+Shape make_shape(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
     Shape shape;
 
     shape.radius = *std::max_element(radius.begin(), radius.end());
 
-    std::vector<glm::vec2> vert = make_polygon(sides, radius, theta_offset);
+    std::vector<glm::vec2> vert = make_polygon(sides, radius);
 
     shape.fill = make_gl_primitive(make_fill(vert), fill_color);
     shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
@@ -171,44 +172,64 @@ Shape make_shape( int sides, const std::vector<float> &radius, float line_thickn
     return shape;
 }
 
-std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+    Shape shape;
+
+    shape.radius = radius;
+
+    std::vector<glm::vec2> vert;
+
+    int sides = 36;
+    for (int i=0; i < sides; i++) {
+        float theta = i * 2*M_PI / sides;
+
+        float x = radius*std::cos(theta);
+        float y = radius*0.5*std::sin(theta);
+
+        vert.push_back(glm::vec2{x, y});
+    }
+
+    shape.fill = make_gl_primitive(make_fill(vert), fill_color);
+    shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
+
+    return shape;
+}
+
+std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
     std::vector<Shape> ret;
 
     std::random_device rd;
     std::mt19937 g(rd());
-    std::uniform_real_distribution<float> dice_theta(0.0, 2*M_PI);
     std::uniform_real_distribution<float> dice_radius(0.4, 1.0);
 
-    for (int sides=3; sides <= 6; sides++) {
-        Shape s = make_shape(sides, {1.f}, 0.1f, line_color, fill_color, dice_theta(g));
+    int idx = 0;
+    auto next_Color = [&]() -> glm::vec4 {
+        auto it = palette.begin();
+        std::advance(it, idx);
+        idx = (idx + 1) % palette.size();
+
+        return it->second;
+    };
+
+    for (int sides=3; sides <= 8; sides++) {
+        Shape s = make_shape(sides, {1.f}, 0.1f, line_color, next_Color());
         ret.push_back(s);
     }
 
-
-    Shape circle = make_shape(36, {1.f}, 0.1f, line_color, fill_color);
+    Shape circle = make_shape(36, {1.f}, 0.1f, line_color, next_Color());
     ret.push_back(circle);
 
-    Shape star = make_shape(10, {1.0f, 0.5f}, 0.1f, line_color, fill_color, dice_theta(g));
+    Shape oval = make_oval(1.f, 0.1f, line_color, next_Color());
+    ret.push_back(oval);
+
+    Shape star = make_shape(10, {1.0f, 0.5f}, 0.1f, line_color, next_Color());
     ret.push_back(star);
 
-    Shape rhombus = make_shape(4, {1.0f, 0.5f}, 0.1f, line_color, fill_color, dice_theta(g));
+    Shape rhombus = make_shape(4, {1.0f, 0.5f}, 0.1f, line_color, next_Color());
     ret.push_back(rhombus);
 
-    // add in some irregular shapes
-    int sides = 6;
-    int num_irregulars = 4;
-
-    for (int i=0; i < num_irregulars; i++) {
-        std::vector<float> radius;
-        radius.push_back(1.0f);
-
-        for (int j=1; j < sides; j++) {
-            radius.push_back(dice_radius(g));
-        }
-
-        Shape s = make_shape(5, radius, 0.1f, line_color, fill_color, dice_theta(g));
-        ret.push_back(s);
-    }
+    Shape crystal = make_shape(5, {1.0f, 0.5f, 0.5f, 0.5f, 0.5f}, 0.1f, line_color, next_Color());
+    ret.push_back(crystal);
 
     return ret;
 }

@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_opengles2.h>
+#include <SDL3/SDL_timer.h>
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -16,6 +17,7 @@
 #include <array>
 #include <algorithm>
 #include <random>
+#include <map>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -27,8 +29,23 @@
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
-const glm::vec4 FILL_COLOR{0.2f, 0.8f, 0.2f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
+constexpr float SHAPE_ROTATION_SPEED = M_PI_2;
+
+std::map<std::string, glm::vec4> tableau10_palette() {
+   return {
+        {"blue", {0x57/255.f, 0x78/255.f, 0xa4/255.f, 1.f}},
+        {"orange", {0xe4/255.f, 0x94/255.f, 0x44/255.f, 1.f}},
+        {"red", {0xd1/255.f, 0x61/255.f, 0x5d/255.f, 1.f}},
+        {"teal", {0x85/255.f, 0xb6/255.f, 0xb2/255.f, 1.f}},
+        {"green", {0x6a/255.f, 0x9f/255.f, 0x58/255.f, 1.f}},
+        {"yellow", {0xe7/255.f, 0xca/255.f, 0x60/255.f, 1.f}},
+        {"purple", {0xa8/255.f, 0x7c/255.f, 0x9f/255.f, 1.f}},
+        {"pink", {0xf1/255.f, 0xa2/255.f, 0xa9/255.f, 1.f}},
+        {"brown", {0x96/255.f, 0x76/255.f, 0x62/255.f, 1.f}},
+        {"grey", {0xb8/255.f, 0xb0/255.f, 0xac/255.f, 1.f}}
+    };
+}
 
 struct AppState {
     SDL_Window *window;
@@ -42,7 +59,7 @@ struct AppState {
 
     bool init = false;
 
-    // actual drawing area
+    // drawing area within the window
     float xoff, yoff;
     float w, h;     
     float xdiv, ydiv;
@@ -54,6 +71,8 @@ struct AppState {
     std::array<int, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
     int selected_shape = -1;
+
+    uint64_t last_tick = 0;
 };
 
 static const char *vertex_shader = R"(#version 300 es
@@ -112,21 +131,21 @@ void update_gl_primitives(AppState &as) {
 void init_game(AppState &as) {
     std::random_device rd;
     std::mt19937 g(rd());
-    std::uniform_real_distribution<float> dice(0.0, 2*M_PI);
+    std::uniform_int_distribution<int> dice_binary(-1, 1);
 
     // Randomly pick NUM_SHAPE from all the shape set
     std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
 
     for (int i=0; i < NUM_SHAPES; i++) {
         as.shape[i] = as.shape_set[i];
-
-        // Randomly rotate the shape
-        float theta = dice(g);
-        as.shape[i].line.theta = theta;
-        as.shape[i].fill.theta = theta;
-
         as.shape_dst[i] = i;
-    }
+
+        if (dice_binary(g) > 0) {
+            as.shape[i].rotation_direction = 1;
+        } else {
+            as.shape[i].rotation_direction = -1;
+        }
+        }
 
     // Randomly assign the shape dest position
     std::shuffle(as.shape_dst.begin(), as.shape_dst.end(), g);
@@ -213,8 +232,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     as->bg = make_gl_primitive({empty, index}, BG_COLOR);
 
-    as->shape_set = make_shape_set(LINE_COLOR, FILL_COLOR);
+    as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
     init_game(*as);
+
+    as->last_tick = SDL_GetTicks();
 
     return SDL_APP_CONTINUE;
 }
@@ -243,7 +264,7 @@ bool recalc_drawing_area(AppState &as) {
         as.yoff = (win_h - as.h) /2;
     }
 
-    as.xdiv = as.w*1.f / (NUM_SHAPES + 1);
+    as.xdiv = as.w*1.f / NUM_SHAPES;
     as.ydiv = as.h / 4.0f;
 
     glViewport(0, 0, win_w, win_h);
@@ -266,11 +287,11 @@ void update_background(const AppState &as) {
 }
 
 glm::vec2 shape_index_to_src_pos(const AppState &as, int idx) {
-    return glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv};
+    return glm::vec2{as.xoff + (idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv};
 }
 
 glm::vec2 shape_index_to_dst_pos(const AppState &as, int idx) {
-    return glm::vec2{as.xoff + (idx+1)*as.xdiv, as.yoff + as.ydiv*3};
+    return glm::vec2{as.xoff + (idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv*3};
 }
 
 int find_selected_shape(const AppState &as, bool dst) {
@@ -292,7 +313,11 @@ int find_selected_shape(const AppState &as, bool dst) {
         }
 
         const auto &s = as.shape[i];
-        if (glm::length(pos - glm::vec2{cx, cy}) < s.radius * s.line.scale) {
+        float dx = std::abs(pos[0] - cx);
+        float dy = std::abs(pos[1] - cy);
+        float r = s.radius * s.line.scale;
+
+        if (dx < r && dy < r) {
             selected_shape = i;
             break;
         }
@@ -393,6 +418,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     draw_gl_primitive(as.program, as.bg);
 
+    float dt = (SDL_GetTicks() - as.last_tick) * 1e-3f;
+    as.last_tick = SDL_GetTicks();
+
     for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = as.shape[i];
         int idx = as.shape_dst[i];
@@ -411,6 +439,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             }
 
             s.line.trans = s.fill.trans;
+
+            float theta = s.line.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
+            if (theta < 0) {
+                theta = 2*M_PI;
+            } else if (theta > 2*M_PI) {
+                theta = 0.f;
+            }
+
+            s.line.theta += SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
+            s.fill.theta += SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
 
             draw_gl_primitive(as.program, s.fill);
             draw_gl_primitive(as.program, s.line);
