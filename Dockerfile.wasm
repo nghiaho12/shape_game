@@ -1,7 +1,7 @@
 FROM debian:12.8
 
-RUN apt update 
-RUN apt install -y g++ git cmake python3 xz-utils
+RUN apt update && \
+    apt install -y g++ git cmake python3 xz-utils
 
 ARG EMSDK_VER=3.1.73
 ARG SDL_VER=preview-3.1.6

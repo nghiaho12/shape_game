@@ -1,7 +1,7 @@
 FROM debian:12.8
 
-RUN apt update 
-RUN apt install -y g++ git cmake libx11-dev libxext-dev libgl1-mesa-dev pkg-config
+RUN apt update && \
+    apt install -y g++ git cmake libx11-dev libxext-dev libgl1-mesa-dev pkg-config
 
 ARG SDL_VER=preview-3.1.6
 ARG GLM_VER=1.0.1

@@ -1,0 +1,46 @@
+FROM debian:12.8
+
+RUN apt update && \
+    apt install -y g++ git cmake wget unzip pkg-config openjdk-17-jdk ant python3
+
+ARG NDK_VER=27c
+ARG SDL_VER=preview-3.1.6
+ARG GLM_VER=1.0.1
+
+RUN wget https://dl.google.com/android/repository/android-ndk-r${NDK_VER}-linux.zip && \
+    unzip android-ndk-r${NDK_VER}-linux.zip
+
+WORKDIR /android-sdk
+RUN wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip && \
+    unzip commandlinetools-linux-11076708_latest.zip
+
+RUN cd cmdline-tools/bin && \
+    yes | ./sdkmanager --licenses --sdk_root=/android-sdk && \
+    ./sdkmanager "platform-tools" "platforms;android-14" --sdk_root=/android-sdk
+
+ARG ANDROID_HOME=/android-sdk
+ARG ANDROID_NDK_HOME=/android-ndk-r${NDK_VER}
+    
+RUN git clone -b $SDL_VER --depth 1 https://github.com/libsdl-org/SDL.git
+RUN cd SDL/build-scripts && \
+    PATH=$PATH:/android-ndk-r27c ./androidbuildlibs.sh
+
+WORKDIR /shape_game
+COPY CMakeLists.txt /shape_game
+COPY src /shape_game/src
+
+RUN cd /android-sdk/SDL/build-scripts && \
+    ./create-android-project.py org.libsdl.shape_game /shape_game/src/*
+
+RUN cd / && git clone -b $GLM_VER --depth 1 https://github.com/g-truc/glm.git
+RUN cd /android-sdk/SDL/build/org.libsdl.shape_game/app/jni/src && \
+    ln -s /glm/glm .
+
+# Enable C++ STL
+RUN cd /android-sdk/SDL/build/org.libsdl.shape_game/app/jni && \
+    sed -i 's/# APP_STL/APP_STL/g' Application.mk
+
+RUN cd /android-sdk/SDL/build/org.libsdl.shape_game && \
+    ANDROID_HOME=$ANDROID_HOME ANDROID_NDK_HOME=$ANDROID_NDK_HOME ./gradlew assembleDebug
+
+CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/android-sdk/SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug"]
