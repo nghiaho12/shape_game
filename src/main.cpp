@@ -63,6 +63,13 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 struct AppState {
     SDL_Window *window;
     SDL_Renderer *renderer;
+    SDL_GLContext gl_ctx;
+
+    SDL_AudioDeviceID audio_device = 0;
+    SDL_AudioStream *stream = NULL;
+    char *wav_path = nullptr;
+    uint8_t *wav_data = NULL;
+    uint32_t wav_data_len = 0;
 
     bool shader_init = false;
     GLuint v_shader;
@@ -174,7 +181,10 @@ void init_game(AppState &as) {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
-    SDL_Init(SDL_INIT_VIDEO);
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+        SDL_Log("SDL_Init failed: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -190,9 +200,31 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     *appstate = as;
 
+    SDL_AudioSpec spec;
+    SDL_asprintf(&as->wav_path, "assets/funbgm032014.wav"); 
+    if (!SDL_LoadWAV(as->wav_path, &spec, &as->wav_data, &as->wav_data_len)) {
+        SDL_Log("Couldn't load .wav file: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    as->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
+    if (!as->stream) {
+        SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    SDL_ResumeAudioStreamDevice(as->stream);
+    as->audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+    if (as->audio_device == 0) {
+        SDL_Log("Couldn't open audio device: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
         std::cerr << "SDL_CreateWindowAndRenderer failed\n";
     }    
+
+    as->gl_ctx = SDL_GL_CreateContext(as->window);
 
     // glEnable(GL_DEBUG_OUTPUT);
     // glDebugMessageCallback(gl_debug_callback, 0);
@@ -213,7 +245,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         std::vector<GLchar> errorLog(maxLength);
         glGetShaderInfoLog(as->v_shader, maxLength, &maxLength, &errorLog[0]);
 
-        std::cout << std::string(errorLog.data()) << "\n";
+        if (maxLength > 0) {
+            std::cout << std::string(errorLog.data()) << "\n";
+        }
+
         std::cerr << "vertex shader compilation failed\n";
         return SDL_APP_FAILURE;
     }
@@ -423,6 +458,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState &as = *static_cast<AppState*>(appstate);
 
+    if (SDL_GetAudioStreamAvailable(as.stream) < (int)as.wav_data_len) {
+        /* feed more data to the stream. It will queue at the end, and trickle out as the hardware needs more data. */
+        SDL_PutAudioStreamData(as.stream, as.wav_data, as.wav_data_len);
+    }
+    SDL_GL_MakeCurrent(as.window, as.gl_ctx);
+
     glUseProgram(as.program);
 
     if (!as.init) {
@@ -485,6 +526,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
+    SDL_GL_SetSwapInterval(1);
     SDL_GL_SwapWindow(as.window);
 
     return SDL_APP_CONTINUE;

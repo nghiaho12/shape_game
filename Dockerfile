@@ -1,13 +1,12 @@
 FROM debian:12.8
 
 RUN apt update && \
-    apt install -y g++ git cmake libx11-dev libxext-dev libgl1-mesa-dev pkg-config
+    apt install -y wget g++ git cmake libx11-dev libxext-dev libgl1-mesa-dev pkg-config libasound2-dev libpulse-dev \
+    binutils coreutils desktop-file-utils fakeroot fuse patchelf python3-pip python3-setuptools squashfs-tools strace util-linux zsync
 
-ARG SDL_VER=preview-3.1.6
-ARG GLM_VER=1.0.1
+RUN pip3 install --break-system-packages appimage-builder==1.1.0
 
-RUN git clone -b $SDL_VER --depth 1 https://github.com/libsdl-org/SDL.git
-
+RUN git clone -b preview-3.1.6 --depth 1 https://github.com/libsdl-org/SDL.git
 RUN cd SDL && \
     mkdir build && \
     cd build && \
@@ -15,7 +14,7 @@ RUN cd SDL && \
     cmake --build . --config Release --parallel && \
     cmake --install . --config Release
 
-RUN git clone -b $GLM_VER --depth 1 https://github.com/g-truc/glm.git
+RUN git clone -b 1.0.1 --depth 1 https://github.com/g-truc/glm.git
 RUN cd glm && \
     cmake -DGLM_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF -B build . && \
     cmake --build build -- all && \
@@ -28,6 +27,7 @@ COPY CMakeLists.txt /shape_game
 RUN mkdir build && \
     cd build && \
     cmake .. && \
-    make
+    make && \
+    make install
 
 CMD ["/shape_game/build/shape_game"]
