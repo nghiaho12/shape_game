@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <random>
 #include <map>
+#include <optional>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -60,16 +61,21 @@ std::map<std::string, glm::vec4> tableau10_palette() {
     return ret;
 }
 
+struct WavAudio {
+    SDL_AudioStream *stream = nullptr;
+    SDL_AudioSpec spec;
+    uint8_t *data = nullptr;
+    uint32_t data_len = 0;
+};
+
 struct AppState {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
+    SDL_Window *window = nullptr;
+    SDL_Renderer *renderer = nullptr;
     SDL_GLContext gl_ctx;
 
     SDL_AudioDeviceID audio_device = 0;
-    SDL_AudioStream *stream = NULL;
-    char *wav_path = nullptr;
-    uint8_t *wav_data = NULL;
-    uint32_t wav_data_len = 0;
+    WavAudio bgm;
+    WavAudio sfx_correct;
 
     bool shader_init = false;
     GLuint v_shader;
@@ -205,6 +211,24 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
+std::optional<WavAudio> load_wav(const char *path) {
+    WavAudio ret;
+
+    if (!SDL_LoadWAV(path, &ret.spec, &ret.data, &ret.data_len)) {
+        SDL_Log("Couldn't load .wav file: %s", path);
+        return {};
+    }
+
+    ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
+
+    if (!ret.stream) {
+        SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
+        return {};
+    }
+
+    return ret;
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
@@ -225,20 +249,24 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     *appstate = as;
 
-    SDL_AudioSpec spec;
-    SDL_asprintf(&as->wav_path, "assets/funbgm032014.wav"); 
-    if (!SDL_LoadWAV(as->wav_path, &spec, &as->wav_data, &as->wav_data_len)) {
-        SDL_Log("Couldn't load .wav file: %s", SDL_GetError());
+    if (auto w = load_wav("assets/funbgm032014.wav")) {
+        as->bgm = *w;
+
+        std::vector<uint8_t> dst(as->bgm.data_len);
+        SDL_MixAudio(dst.data(), as->bgm.data, as->bgm.spec.format, as->bgm.data_len, 0.1);
+        memcpy(as->bgm.data, dst.data(), dst.size()*sizeof(uint8_t));
+    } else {
         return SDL_APP_FAILURE;
     }
 
-    as->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
-    if (!as->stream) {
-        SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
+    if (auto w = load_wav("assets/dingCling-positive.wav")) {
+        as->sfx_correct = *w;
+    } else {
         return SDL_APP_FAILURE;
     }
 
-    SDL_ResumeAudioStreamDevice(as->stream);
+    SDL_ResumeAudioStreamDevice(as->bgm.stream);
+
     as->audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
     if (as->audio_device == 0) {
         SDL_Log("Couldn't open audio device: %s", SDL_GetError());
@@ -246,7 +274,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
 
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
-        std::cerr << "SDL_CreateWindowAndRenderer failed\n";
+        SDL_Log("SDL_CreateWindowAndRenderer failed");
     }    
 
     as->gl_ctx = SDL_GL_CreateContext(as->window);
@@ -409,6 +437,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                 as.highlight_dst = dst_idx;
                 if (as.shape_dst[as.selected_shape] == dst_idx) {
                     as.shape_done[as.selected_shape] = true;
+
+                    SDL_PutAudioStreamData(as.sfx_correct.stream, as.sfx_correct.data, as.sfx_correct.data_len);
+                    SDL_ResumeAudioStreamDevice(as.sfx_correct.stream);
                 }
             }
 
@@ -453,10 +484,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState &as = *static_cast<AppState*>(appstate);
 
-    if (SDL_GetAudioStreamAvailable(as.stream) < (int)as.wav_data_len) {
-        /* feed more data to the stream. It will queue at the end, and trickle out as the hardware needs more data. */
-        SDL_PutAudioStreamData(as.stream, as.wav_data, as.wav_data_len);
+    if (SDL_GetAudioStreamAvailable(as.bgm.stream) < (int)as.bgm.data_len) {
+        SDL_PutAudioStreamData(as.bgm.stream, as.bgm.data, as.bgm.data_len);
     }
+
     SDL_GL_MakeCurrent(as.window, as.gl_ctx);
 
     glUseProgram(as.program);
@@ -482,7 +513,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     float dt = (SDL_GetTicks() - as.last_tick) * 1e-3f;
     as.last_tick = SDL_GetTicks();
 
-    for (size_t i=0; i < as.shape.size(); i++) {
+    for (int i=0; i < static_cast<int>(as.shape.size()); i++) {
         auto &s = as.shape[i];
         int dst_idx = as.shape_dst[i];
 

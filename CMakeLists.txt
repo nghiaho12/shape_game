@@ -3,6 +3,8 @@ project(shape_game)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "-g")
+set(CMAKE_CXX_FLAGS "-Wall")
+
 find_package(SDL3 REQUIRED)
 find_package(OpenGL REQUIRED)
 
