@@ -126,6 +126,31 @@ void main() {
     o_color = v_color;
 })";
 
+bool compile_shader(GLuint s, const char *shader) {
+    int length = strlen(shader);
+    glShaderSource(s, 1, static_cast<const GLchar**>(&shader), &length);
+    glCompileShader(s);
+
+    GLint status;
+    glGetShaderiv(s, GL_COMPILE_STATUS, &status);
+
+    if (status == GL_FALSE) {
+        GLint len = 0;
+        glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
+
+        std::vector<GLchar> error(len);
+        glGetShaderInfoLog(s, len, &len, error.data());
+
+        if (len > 0) {
+            SDL_Log("compile_shder error: %s", error.data());
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
 // void GLAPIENTRY gl_debug_callback( 
 //     GLenum source,
 //     GLenum type,
@@ -232,41 +257,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->v_shader = glCreateShader(GL_VERTEX_SHADER);
     as->f_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
-    int length = strlen(vertex_shader);
-    glShaderSource(as->v_shader, 1, static_cast<const GLchar**>(&vertex_shader), &length );
-    glCompileShader(as->v_shader);
-
-    GLint status;
-    glGetShaderiv(as->v_shader, GL_COMPILE_STATUS, &status);
-    if (status == GL_FALSE) {
-        GLint maxLength = 0;
-        glGetShaderiv(as->v_shader, GL_INFO_LOG_LENGTH, &maxLength);
-
-        std::vector<GLchar> errorLog(maxLength);
-        glGetShaderInfoLog(as->v_shader, maxLength, &maxLength, &errorLog[0]);
-
-        if (maxLength > 0) {
-            std::cout << std::string(errorLog.data()) << "\n";
-        }
-
-        std::cerr << "vertex shader compilation failed\n";
+    if (!compile_shader(as->v_shader, vertex_shader)) {
         return SDL_APP_FAILURE;
     }
 
-    length = strlen(fragment_shader);
-    glShaderSource(as->f_shader, 1, static_cast<const GLchar**>(&fragment_shader), &length);
-    glCompileShader(as->f_shader);
-
-    glGetShaderiv(as->f_shader, GL_COMPILE_STATUS, &status);
-    if (status == GL_FALSE) {
-        GLint maxLength = 0;
-        glGetShaderiv(as->f_shader, GL_INFO_LOG_LENGTH, &maxLength);
-
-        std::vector<GLchar> errorLog(maxLength);
-        glGetShaderInfoLog(as->f_shader, maxLength, &maxLength, &errorLog[0]);
-
-        std::cout << std::string(errorLog.data()) << "\n";
-        std::cerr << "fragment shader compilation failed\n";
+    if (!compile_shader(as->f_shader, fragment_shader)) {
         return SDL_APP_FAILURE;
     }
 
