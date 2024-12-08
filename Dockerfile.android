@@ -3,6 +3,7 @@ FROM debian:12.8
 RUN apt update && \
     apt install -y g++ git cmake wget unzip pkg-config openjdk-17-jdk ant python3
 
+# Android SDK
 RUN wget https://dl.google.com/android/repository/android-ndk-r27c-linux.zip && \
     unzip android-ndk-r27c-linux.zip
 
@@ -14,28 +15,33 @@ RUN cd cmdline-tools/bin && \
     yes | ./sdkmanager --licenses --sdk_root=/android-sdk && \
     ./sdkmanager "platform-tools" "platforms;android-14" --sdk_root=/android-sdk
 
+# SDL
+WORKDIR /
 RUN git clone -b preview-3.1.6 --depth 1 https://github.com/libsdl-org/SDL.git
 RUN cd SDL/build-scripts && \
     PATH=$PATH:/android-ndk-r27c ./androidbuildlibs.sh
 
-WORKDIR /shape_game
-COPY CMakeLists.txt /shape_game
-COPY src /shape_game/src
+# Creste Android project with an empty main.cpp to cache this step
+RUN mkdir -p /shape_game/src && \
+    touch /shape_game/src/main.cpp && \
+    cd /SDL/build-scripts && \
+    ./create-android-project.py org.libsdl.shape_game /shape_game/src/main.cpp
 
-RUN cd /android-sdk/SDL/build-scripts && \
-    ./create-android-project.py org.libsdl.shape_game /shape_game/src/*
-
+# GLM is header only
 RUN cd / && git clone -b 1.0.1 --depth 1 https://github.com/g-truc/glm.git
-RUN cd /android-sdk/SDL/build/org.libsdl.shape_game/app/jni/src && \
+RUN cd /SDL/build/org.libsdl.shape_game/app/jni/src && \
     ln -s /glm/glm .
 
 # Enable C++ STL
-RUN cd /android-sdk/SDL/build/org.libsdl.shape_game/app/jni && \
+RUN cd /SDL/build/org.libsdl.shape_game/app/jni && \
     sed -i 's/# APP_STL/APP_STL/g' Application.mk
 
-COPY assets /android-sdk/SDL/build/org.libsdl.shape_game/app/src/main/assets/
+# Make the APK
+COPY Android.mk /android-sdk/SDL/build/org.libsdl.shape_game/app/jni/src
+COPY src /SDL/build/org.libsdl.shape_game/app/src/
+COPY assets /SDL/build/org.libsdl.shape_game/app/src/main/assets/
 
-RUN cd /android-sdk/SDL/build/org.libsdl.shape_game && \
+RUN cd /SDL/build/org.libsdl.shape_game && \
     ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=android-ndk-r27c ./gradlew assembleDebug
 
-CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/android-sdk/SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug"]
+CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug"]

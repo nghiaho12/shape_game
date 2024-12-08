@@ -20,7 +20,7 @@
 #include <map>
 #include <optional>
 
-#ifdef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__AA
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #endif
@@ -63,7 +63,7 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 
 struct WavAudio {
     SDL_AudioStream *stream = nullptr;
-    SDL_AudioSpec spec;
+    SDL_AudioSpec spec{};
     uint8_t *data = nullptr;
     uint32_t data_len = 0;
 };
@@ -78,17 +78,20 @@ struct AppState {
     WavAudio sfx_correct;
 
     bool shader_init = false;
-    GLuint v_shader;
-    GLuint f_shader;
-    GLuint program;
-    GLuint vao;
+    GLuint v_shader = 0;
+    GLuint f_shader = 0;
+    GLuint program = 0;
+    GLuint vao = 0;
 
     bool init = false;
 
     // drawing area within the window
-    float xoff, yoff;
-    float w, h;     
-    float xdiv, ydiv;
+    float xoff = 0.0f;
+    float yoff = 0.0f;
+    float w = 0.f;
+    float h = 0.f;     
+    float xdiv = 0.f;
+    float ydiv = 0.f;
 
     GLPrimitive bg;
 
@@ -211,7 +214,7 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
-std::optional<WavAudio> load_wav(const char *path) {
+std::optional<WavAudio> load_wav(const char *path, float volume=1.0f) {
     WavAudio ret;
 
     if (!SDL_LoadWAV(path, &ret.spec, &ret.data, &ret.data_len)) {
@@ -224,6 +227,12 @@ std::optional<WavAudio> load_wav(const char *path) {
     if (!ret.stream) {
         SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
         return {};
+    }
+
+    if (volume > 0.0f && volume < 1.0f) {
+        std::vector<uint8_t> dst(ret.data_len);
+        SDL_MixAudio(dst.data(), ret.data, ret.spec.format, ret.data_len, volume);
+        memcpy(ret.data, dst.data(), dst.size()*sizeof(uint8_t));
     }
 
     return ret;
@@ -249,12 +258,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     *appstate = as;
 
-    if (auto w = load_wav("assets/funbgm032014.wav")) {
+    if (auto w = load_wav("assets/funbgm032014.wav", 0.1)) {
         as->bgm = *w;
-
-        std::vector<uint8_t> dst(as->bgm.data_len);
-        SDL_MixAudio(dst.data(), as->bgm.data, as->bgm.spec.format, as->bgm.data_len, 0.1);
-        memcpy(as->bgm.data, dst.data(), dst.size()*sizeof(uint8_t));
     } else {
         return SDL_APP_FAILURE;
     }
@@ -505,7 +510,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     glBindVertexArrayOES(as.vao);
 
-    float cx, cy;
+    float cx=0, cy=0;
     SDL_GetMouseState(&cx, &cy);
 
     draw_gl_primitive(as.program, as.bg);
