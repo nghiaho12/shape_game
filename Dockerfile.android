@@ -21,11 +21,15 @@ RUN git clone -b preview-3.1.6 --depth 1 https://github.com/libsdl-org/SDL.git
 RUN cd SDL/build-scripts && \
     PATH=$PATH:/android-ndk-r27c ./androidbuildlibs.sh
 
-# Creste Android project with an empty main.cpp to cache this step
+# Create Android project with an empty main.cpp to cache the gradle download step
 RUN mkdir -p /shape_game/src && \
     touch /shape_game/src/main.cpp && \
     cd /SDL/build-scripts && \
     ./create-android-project.py org.libsdl.shape_game /shape_game/src/main.cpp
+
+# Build the empty project to get everything in place
+RUN cd /SDL/build/org.libsdl.shape_game && \
+    ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=android-ndk-r27c ./gradlew assembleDebug
 
 # GLM is header only
 RUN cd / && git clone -b 1.0.1 --depth 1 https://github.com/g-truc/glm.git
@@ -36,12 +40,21 @@ RUN cd /SDL/build/org.libsdl.shape_game/app/jni/src && \
 RUN cd /SDL/build/org.libsdl.shape_game/app/jni && \
     sed -i 's/# APP_STL/APP_STL/g' Application.mk
 
-# Make the APK
-COPY Android.mk /android-sdk/SDL/build/org.libsdl.shape_game/app/jni/src
-COPY src /SDL/build/org.libsdl.shape_game/app/src/
+# Enable C++20
+RUN cd /SDL/build/org.libsdl.shape_game/app/jni/src && \
+    echo 'set(CMAKE_CXX_STANDARD 20)' >> CMakeLists.txt && \
+    echo 'APP_CPPFLAGS := -std=c++20' >> /SDL/build/org.libsdl.shape_game/app/jni/Application.mk
+
+# Enable x86_64 build for debugging on the emulator
+RUN cd /SDL/build/org.libsdl.shape_game/app && \
+    sed -i "s/abiFilters 'arm64-v8a'/abiFilters 'arm64-v8a','x86_64'/g" build.gradle
+
+# Build our actual project
+COPY Android.mk /SDL/build/org.libsdl.shape_game/app/jni/src
+COPY src /SDL/build/org.libsdl.shape_game/app/jni/src/
 COPY assets /SDL/build/org.libsdl.shape_game/app/src/main/assets/
 
 RUN cd /SDL/build/org.libsdl.shape_game && \
-    ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=android-ndk-r27c ./gradlew assembleDebug
+    ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=/android-ndk-r27c ./gradlew assembleDebug
 
 CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug"]

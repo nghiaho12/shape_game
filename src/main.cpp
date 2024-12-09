@@ -20,12 +20,25 @@
 #include <map>
 #include <optional>
 
-#ifdef __EMSCRIPTEN__AA
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #endif
 
 #include "geometry.hpp"
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#include <stdarg.h>
+void debug(const char *fmt, ...) {
+   va_list args;
+   va_start(args, fmt);
+   __android_log_vprint(ANDROID_LOG_INFO, "SDL", fmt, args);
+   va_end(args);
+}
+#else
+#define debug(...) SDL_Log(__VA_ARGS__)
+#endif
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
@@ -151,7 +164,7 @@ bool compile_shader(GLuint s, const char *shader) {
         glGetShaderInfoLog(s, len, &len, error.data());
 
         if (len > 0) {
-            SDL_Log("compile_shder error: %s", error.data());
+            debug("compile_shder error: %s", error.data());
         }
 
         return false;
@@ -218,14 +231,14 @@ std::optional<WavAudio> load_wav(const char *path, float volume=1.0f) {
     WavAudio ret;
 
     if (!SDL_LoadWAV(path, &ret.spec, &ret.data, &ret.data_len)) {
-        SDL_Log("Couldn't load .wav file: %s", path);
+        debug("Couldn't load .wav file: %s", path);
         return {};
     }
 
     ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
 
     if (!ret.stream) {
-        SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
+        debug("Couldn't create audio stream: %s", SDL_GetError());
         return {};
     }
 
@@ -240,7 +253,7 @@ std::optional<WavAudio> load_wav(const char *path, float volume=1.0f) {
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        SDL_Log("SDL_Init failed: %s", SDL_GetError());
+        debug("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
@@ -258,13 +271,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     *appstate = as;
 
-    if (auto w = load_wav("assets/funbgm032014.wav", 0.1)) {
+    std::string base_path = "assets/";
+#ifdef __ANDROID__
+    base_path = "";
+#endif
+
+    if (auto w = load_wav((base_path + "funbgm032014.wav").c_str(), 0.1)) {
         as->bgm = *w;
     } else {
         return SDL_APP_FAILURE;
     }
 
-    if (auto w = load_wav("assets/dingCling-positive.wav")) {
+    if (auto w = load_wav((base_path + "dingCling-positive.wav").c_str())) {
         as->sfx_correct = *w;
     } else {
         return SDL_APP_FAILURE;
@@ -274,12 +292,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     as->audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
     if (as->audio_device == 0) {
-        SDL_Log("Couldn't open audio device: %s", SDL_GetError());
+        debug("Couldn't open audio device: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
-        SDL_Log("SDL_CreateWindowAndRenderer failed");
+        debug("SDL_CreateWindowAndRenderer failed");
     }    
 
     as->gl_ctx = SDL_GL_CreateContext(as->window);
@@ -306,7 +324,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     glGenVertexArraysOES(1, &as->vao);
     glBindVertexArrayOES(as->vao);
 
-    // background
+    // background color for drawing area
+    // the area size is determined later
     std::vector<glm::vec2> empty(4);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     as->bg = make_gl_primitive({empty, index}, BG_COLOR);
@@ -430,16 +449,19 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             break;
 
         case SDL_EVENT_MOUSE_MOTION:
-            if (event->motion.state) {
+            as.highlight_dst = -1;
+
+            if (as.selected_shape != -1) {
                 as.highlight_dst = find_selected_shape(as, true);
             }
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
+            as.highlight_dst = -1;
+
             if (as.selected_shape != -1) {
                 int dst_idx = find_selected_shape(as, true);
 
-                as.highlight_dst = dst_idx;
                 if (as.shape_dst[as.selected_shape] == dst_idx) {
                     as.shape_done[as.selected_shape] = true;
 
