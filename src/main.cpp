@@ -257,11 +257,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         return SDL_APP_FAILURE;
     }
 
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES); 
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-
     AppState *as = new AppState();
     
     if (!as) {
@@ -296,11 +291,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         return SDL_APP_FAILURE;
     }
 
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES); 
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
         debug("SDL_CreateWindowAndRenderer failed");
     }    
 
+#ifndef __EMSCRIPTEN__
     as->gl_ctx = SDL_GL_CreateContext(as->window);
+    SDL_GL_MakeCurrent(as->window, as->gl_ctx);
+#endif
 
     // glEnable(GL_DEBUG_OUTPUT);
     // glDebugMessageCallback(gl_debug_callback, 0);
@@ -515,7 +518,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_PutAudioStreamData(as.bgm.stream, as.bgm.data, as.bgm.data_len);
     }
 
+#ifndef __EMSCRIPTEN__
     SDL_GL_MakeCurrent(as.window, as.gl_ctx);
+#endif
 
     glUseProgram(as.program);
 

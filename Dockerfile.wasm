@@ -3,17 +3,15 @@ FROM debian:12.8
 RUN apt update && \
     apt install -y g++ git cmake python3 xz-utils
 
-ARG EMSDK_VER=3.1.73
-ARG SDL_VER=preview-3.1.6
-ARG GLM_VER=1.0.1
+ENV EMSDK_VER=3.1.73
 
 RUN git clone -b $EMSDK_VER --depth 1 https://github.com/emscripten-core/emsdk.git
 RUN cd emsdk && \
     ./emsdk install $EMSDK_VER
 
-RUN git clone -b $SDL_VER --depth 1 https://github.com/libsdl-org/SDL.git
+RUN git clone -b preview-3.1.6 --depth 1 https://github.com/libsdl-org/SDL.git
 
-RUN cd /emsdk&& \
+RUN cd /emsdk && \
     ./emsdk activate $EMSDK_VER && \
     . ./emsdk_env.sh && \
     cd /SDL && \
@@ -23,9 +21,9 @@ RUN cd /emsdk&& \
     emmake make -j4 && \
     emmake make install
 
-RUN git clone -b $GLM_VER --depth 1 https://github.com/g-truc/glm.git
+RUN git clone -b 1.0.1 --depth 1 https://github.com/g-truc/glm.git
 
-RUN cd /emsdk&& \
+RUN cd /emsdk && \
     ./emsdk activate $EMSDK_VER && \
     . ./emsdk_env.sh && \
     cd /glm && \
@@ -36,12 +34,13 @@ RUN cd /emsdk&& \
     emmake make install
 
 WORKDIR /shape_game
-COPY src/ /shape_game/src
 COPY CMakeLists.txt /shape_game
+COPY src/ /shape_game/src/
+COPY assets/ /shape_game/assets/
 
 RUN mkdir build && \
     cd build && \
-    /bin/bash -c ". /emsdk/emsdk_env.sh && emcmake cmake .. && emmake make" && \
+    /bin/bash -c ". /emsdk/emsdk_env.sh && emcmake cmake .. && VERBOSE=1 emmake make" && \
     ln -s shape_game.html index.html
 
 CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/shape_game/build"]
