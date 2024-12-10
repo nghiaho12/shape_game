@@ -14,6 +14,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <cstdio>
 #include <array>
 #include <algorithm>
 #include <random>
@@ -24,8 +25,6 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #endif
-
-#include "geometry.hpp"
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -39,6 +38,9 @@ void debug(const char *fmt, ...) {
 #else
 #define debug(...) SDL_Log(__VA_ARGS__)
 #endif
+
+#include "geometry.hpp"
+#include "stb_vorbis.hpp"
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
@@ -227,6 +229,47 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
+std::optional<WavAudio> load_ogg(const char *path, float volume=1.0f) {
+    // NOTE: Can't use fopen on files inside an Android APK.
+    // SDL provides IO abstraction for this.
+    size_t data_size;
+    uint8_t *data = static_cast<uint8_t*>(SDL_LoadFile(path, &data_size));
+
+    if (!data) {
+        debug("Failed to open file '%s'.", path);
+        return {};
+    }
+
+    WavAudio ret;
+
+    short *output;
+    int samples = stb_vorbis_decode_memory(data, data_size, &ret.spec.channels, &ret.spec.freq, &output);
+   
+    ret.data_len = samples * sizeof(short);
+    ret.data = new uint8_t[ret.data_len];
+    memcpy(ret.data, output, ret.data_len);
+
+    free(output);
+    SDL_free(data);
+
+    ret.spec.format = SDL_AUDIO_S16LE;
+
+    ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
+
+    if (!ret.stream) {
+        debug("Couldn't create audio stream: %s", SDL_GetError());
+        return {};
+    }
+
+    if (volume > 0.0f && volume < 1.0f) {
+        std::vector<uint8_t> dst(ret.data_len);
+        SDL_MixAudio(dst.data(), ret.data, ret.spec.format, ret.data_len, volume);
+        memcpy(ret.data, dst.data(), dst.size()*sizeof(uint8_t));
+    }
+
+    return ret;
+}
+
 std::optional<WavAudio> load_wav(const char *path, float volume=1.0f) {
     WavAudio ret;
 
@@ -271,13 +314,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     base_path = "";
 #endif
 
-    if (auto w = load_wav((base_path + "funbgm032014.wav").c_str(), 0.1)) {
+
+    if (auto w = load_ogg((base_path + "bgm.ogg").c_str(), 0.1)) {
         as->bgm = *w;
     } else {
         return SDL_APP_FAILURE;
     }
 
-    if (auto w = load_wav((base_path + "dingCling-positive.wav").c_str())) {
+    if (auto w = load_wav((base_path + "ding.wav").c_str())) {
         as->sfx_correct = *w;
     } else {
         return SDL_APP_FAILURE;

@@ -15,6 +15,8 @@ add_executable(${EXECUTABLE_NAME}
     src/main.cpp
     src/geometry.cpp
     src/geometry.hpp
+    src/stb_vorbis.cpp
+    src/stb_vorbis.hpp
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3 ${OPENGL_LIBRARIES})

@@ -6,9 +6,10 @@ LOCAL_MODULE := main
 
 # Add your application source files here...
 LOCAL_SRC_FILES := \
+    main.cpp \
     geometry.cpp \
     geometry.hpp \
-    main.cpp
+	minivorbis.hpp
 
 SDL_PATH := ../SDL  # SDL
 
