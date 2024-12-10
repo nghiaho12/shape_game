@@ -76,11 +76,10 @@ std::map<std::string, glm::vec4> tableau10_palette() {
     return ret;
 }
 
-struct WavAudio {
+struct Audio {
     SDL_AudioStream *stream = nullptr;
     SDL_AudioSpec spec{};
-    uint8_t *data = nullptr;
-    uint32_t data_len = 0;
+    std::vector<uint8_t> data;
 };
 
 struct AppState {
@@ -89,8 +88,8 @@ struct AppState {
     SDL_GLContext gl_ctx;
 
     SDL_AudioDeviceID audio_device = 0;
-    WavAudio bgm;
-    WavAudio sfx_correct;
+    Audio bgm;
+    Audio sfx_correct;
 
     bool shader_init = false;
     GLuint v_shader = 0;
@@ -229,7 +228,7 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
-std::optional<WavAudio> load_ogg(const char *path, float volume=1.0f) {
+std::optional<Audio> load_ogg(const char *path, float volume=1.0f) {
     // NOTE: Can't use fopen on files inside an Android APK.
     // SDL provides IO abstraction for this.
     size_t data_size;
@@ -240,14 +239,13 @@ std::optional<WavAudio> load_ogg(const char *path, float volume=1.0f) {
         return {};
     }
 
-    WavAudio ret;
+    Audio ret;
 
     short *output;
     int samples = stb_vorbis_decode_memory(data, data_size, &ret.spec.channels, &ret.spec.freq, &output);
-   
-    ret.data_len = samples * sizeof(short);
-    ret.data = new uint8_t[ret.data_len];
-    memcpy(ret.data, output, ret.data_len);
+  
+    ret.data.resize(samples * sizeof(short));
+    memcpy(ret.data.data(), output, ret.data.size());
 
     free(output);
     SDL_free(data);
@@ -262,21 +260,27 @@ std::optional<WavAudio> load_ogg(const char *path, float volume=1.0f) {
     }
 
     if (volume > 0.0f && volume < 1.0f) {
-        std::vector<uint8_t> dst(ret.data_len);
-        SDL_MixAudio(dst.data(), ret.data, ret.spec.format, ret.data_len, volume);
-        memcpy(ret.data, dst.data(), dst.size()*sizeof(uint8_t));
+        std::vector<uint8_t> tmp(ret.data.size());
+        SDL_MixAudio(tmp.data(), ret.data.data(), ret.spec.format, ret.data.size(), volume);
+        ret.data.swap(tmp);
     }
 
     return ret;
 }
 
-std::optional<WavAudio> load_wav(const char *path, float volume=1.0f) {
-    WavAudio ret;
+std::optional<Audio> load_wav(const char *path, float volume=1.0f) {
+    Audio ret;
 
-    if (!SDL_LoadWAV(path, &ret.spec, &ret.data, &ret.data_len)) {
+    uint8_t *data = nullptr;
+    uint32_t data_len;
+
+    if (!SDL_LoadWAV(path, &ret.spec, &data, &data_len)) {
         debug("Couldn't load .wav file: %s", path);
         return {};
     }
+
+    ret.data.assign(data, data + data_len);
+    SDL_free(data);
 
     ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
 
@@ -286,9 +290,9 @@ std::optional<WavAudio> load_wav(const char *path, float volume=1.0f) {
     }
 
     if (volume > 0.0f && volume < 1.0f) {
-        std::vector<uint8_t> dst(ret.data_len);
-        SDL_MixAudio(dst.data(), ret.data, ret.spec.format, ret.data_len, volume);
-        memcpy(ret.data, dst.data(), dst.size()*sizeof(uint8_t));
+        std::vector<uint8_t> tmp(ret.data.size());
+        SDL_MixAudio(tmp.data(), ret.data.data(), ret.spec.format, ret.data.size(), volume);
+        ret.data.swap(tmp);
     }
 
     return ret;
@@ -512,7 +516,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                 if (as.shape_dst[as.selected_shape] == dst_idx) {
                     as.shape_done[as.selected_shape] = true;
 
-                    SDL_PutAudioStreamData(as.sfx_correct.stream, as.sfx_correct.data, as.sfx_correct.data_len);
+                    SDL_PutAudioStreamData(as.sfx_correct.stream, as.sfx_correct.data.data(), as.sfx_correct.data.size());
                     SDL_ResumeAudioStreamDevice(as.sfx_correct.stream);
                 }
             }
@@ -558,8 +562,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState &as = *static_cast<AppState*>(appstate);
 
-    if (SDL_GetAudioStreamAvailable(as.bgm.stream) < (int)as.bgm.data_len) {
-        SDL_PutAudioStreamData(as.bgm.stream, as.bgm.data, as.bgm.data_len);
+    if (SDL_GetAudioStreamAvailable(as.bgm.stream) < static_cast<int>(as.bgm.data.size())) {
+        SDL_PutAudioStreamData(as.bgm.stream, as.bgm.data.data(), as.bgm.data.size());
     }
 
 #ifndef __EMSCRIPTEN__
