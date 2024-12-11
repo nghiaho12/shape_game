@@ -1,10 +1,27 @@
 Simple shape matching game for kids written using SDL3 and OpenGL ES.
-Dockerfile provided for Linux, WebAssembly and Android platform.
+It runs on Linux, Android and the web.
+
+# Prerequisite
+Install git-lfs eg.
+```
+sudo apt install git-lfs
+```
+
+You should see a shape_game/assets folder with some sound files.
+
+Install Docker if you want to build for Android or web eg.
+```
+sudo apt install docker-ce
+```
 
 # Linux
 ```
-docker build -t shape_game .
-docker run --rm --network=host --ipc=host -e DISPLAY -u $(id -u) shape_game
+mkdir build
+cd build
+cmake ..
+make
+cd ..
+./build/shape_game
 ```
 
 Hit ESC to quit.
@@ -30,5 +47,5 @@ Assets
 - https://opengameart.org/content/fun-a-bgm-track
 - https://opengameart.org/content/6-user-interface-ding-clicks
 
-Vorbis decoder
-- https://github.com/edubart/minivorbis
+Ogg Vorbis decoder
+ - https://github.com/nothings/stb
