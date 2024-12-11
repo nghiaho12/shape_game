@@ -1,5 +1,5 @@
 #include "audio.hpp"
-#include "debug.hpp"
+#include "log.hpp"
 #include "stb_vorbis.hpp"
 
 #include <cstdlib>
@@ -11,7 +11,7 @@ std::optional<Audio> load_ogg(const char *path, float volume) {
     uint8_t *data = static_cast<uint8_t*>(SDL_LoadFile(path, &data_size));
 
     if (!data) {
-        debug("Failed to open file '%s'.", path);
+        LOG("Failed to open file '%s'.", path);
         return {};
     }
 
@@ -31,7 +31,7 @@ std::optional<Audio> load_ogg(const char *path, float volume) {
     ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
 
     if (!ret.stream) {
-        debug("Couldn't create audio stream: %s", SDL_GetError());
+        LOG("Couldn't create audio stream: %s", SDL_GetError());
         return {};
     }
 
@@ -52,7 +52,7 @@ std::optional<Audio> load_wav(const char *path, float volume) {
     uint32_t data_len;
 
     if (!SDL_LoadWAV(path, &ret.spec, &data, &data_len)) {
-        debug("Couldn't load .wav file: %s", path);
+        LOG("Couldn't load .wav file: %s", path);
         return {};
     }
 
@@ -62,7 +62,7 @@ std::optional<Audio> load_wav(const char *path, float volume) {
     ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
 
     if (!ret.stream) {
-        debug("Couldn't create audio stream: %s", SDL_GetError());
+        LOG("Couldn't create audio stream: %s", SDL_GetError());
         return {};
     }
 

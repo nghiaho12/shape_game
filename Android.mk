@@ -14,7 +14,7 @@ LOCAL_SRC_FILES := \
     audio.cpp \
     audio.hpp \
     shader.hpp \
-    debug.hpp
+    log.hpp
 
 SDL_PATH := ../SDL  # SDL
 

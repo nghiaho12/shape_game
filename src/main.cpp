@@ -28,7 +28,7 @@
 #include "geometry.hpp"
 #include "audio.hpp"
 #include "shader.hpp"
-#include "debug.hpp"
+#include "log.hpp"
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
@@ -143,14 +143,14 @@ void init_game(AppState &as) {
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        debug("SDL_Init failed: %s", SDL_GetError());
+        LOG("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
     AppState *as = new AppState();
     
     if (!as) {
-        debug("can't alloc memory for AppState");
+        LOG("can't alloc memory for AppState");
         return SDL_APP_FAILURE;
     }
 
@@ -177,7 +177,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     as->audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
     if (as->audio_device == 0) {
-        debug("Couldn't open audio device: %s", SDL_GetError());
+        LOG("Couldn't open audio device: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
@@ -187,7 +187,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
-        debug("SDL_CreateWindowAndRenderer failed");
+        LOG("SDL_CreateWindowAndRenderer failed");
     }    
 
 #ifndef __EMSCRIPTEN__
@@ -232,7 +232,7 @@ bool recalc_drawing_area(AppState &as) {
     int win_w, win_h;
 
     if (!SDL_GetWindowSize(as.window, &win_w, &win_h)) {
-        debug("%s", SDL_GetError());
+        LOG("%s", SDL_GetError());
         return false;
     }
 

@@ -3,7 +3,7 @@
 #include <SDL3/SDL_opengles2.h>
 #include <cstring>
 #include <vector>
-#include "debug.hpp"
+#include "log.hpp"
 
 static const char *vertex_shader = R"(#version 300 es
 precision mediump float;
@@ -51,7 +51,7 @@ bool compile_shader(GLuint s, const char *shader) {
         glGetShaderInfoLog(s, len, &len, error.data());
 
         if (len > 0) {
-            debug("compile_shder error: %s", error.data());
+            LOG("compile_shder error: %s", error.data());
         }
 
         return false;

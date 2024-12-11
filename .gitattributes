@@ -1,0 +1,2 @@
+assets/bgm.ogg filter=lfs diff=lfs merge=lfs -text
+assets/ding.wav filter=lfs diff=lfs merge=lfs -text

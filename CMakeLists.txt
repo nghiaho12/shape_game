@@ -20,7 +20,7 @@ add_executable(${EXECUTABLE_NAME}
     src/audio.cpp
     src/audio.hpp
     src/shader.hpp
-    src/debug.hpp
+    src/log.hpp
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3 ${OPENGL_LIBRARIES})
