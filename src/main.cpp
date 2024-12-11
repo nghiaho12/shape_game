@@ -26,21 +26,10 @@
 #include <emscripten/html5.h>
 #endif
 
-#ifdef __ANDROID__
-#include <android/log.h>
-#include <stdarg.h>
-void debug(const char *fmt, ...) {
-   va_list args;
-   va_start(args, fmt);
-   __android_log_vprint(ANDROID_LOG_INFO, "SDL", fmt, args);
-   va_end(args);
-}
-#else
-#define debug(...) SDL_Log(__VA_ARGS__)
-#endif
-
 #include "geometry.hpp"
-#include "stb_vorbis.hpp"
+#include "audio.hpp"
+#include "shader.hpp"
+#include "debug.hpp"
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
@@ -75,12 +64,6 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 
     return ret;
 }
-
-struct Audio {
-    SDL_AudioStream *stream = nullptr;
-    SDL_AudioSpec spec{};
-    std::vector<uint8_t> data;
-};
 
 struct AppState {
     SDL_Window *window = nullptr;
@@ -118,75 +101,6 @@ struct AppState {
 
     uint64_t last_tick = 0;
 };
-
-static const char *vertex_shader = R"(#version 300 es
-precision mediump float;
-
-layout(location = 0) in vec2 position;
-uniform float scale;
-uniform float theta;
-uniform vec2 trans;
-uniform vec4 color;
-uniform mat4 projection_matrix;
-out vec4 v_color;
-
-void main() {
-    float c = cos(theta);
-    float s = sin(theta);
-    mat2 R = mat2(c, s, -s, c);
-
-    gl_Position = projection_matrix * vec4(R*position*scale + trans, 0.0, 1.0);
-    v_color = color;
-})";
-
-static const char *fragment_shader = R"(#version 300 es
-precision mediump float;
-
-in vec4 v_color;
-out vec4 o_color;
-
-void main() {
-    o_color = v_color;
-})";
-
-bool compile_shader(GLuint s, const char *shader) {
-    int length = strlen(shader);
-    glShaderSource(s, 1, static_cast<const GLchar**>(&shader), &length);
-    glCompileShader(s);
-
-    GLint status;
-    glGetShaderiv(s, GL_COMPILE_STATUS, &status);
-
-    if (status == GL_FALSE) {
-        GLint len = 0;
-        glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
-
-        std::vector<GLchar> error(len);
-        glGetShaderInfoLog(s, len, &len, error.data());
-
-        if (len > 0) {
-            debug("compile_shder error: %s", error.data());
-        }
-
-        return false;
-    }
-
-    return true;
-}
-
-// void GLAPIENTRY gl_debug_callback( 
-//     GLenum source,
-//     GLenum type,
-//     GLuint id,
-//     GLenum severity,
-//     GLsizei length,
-//     const GLchar* message,
-//     const void* userParam) {
-//
-//     fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-//            ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
-//             type, severity, message );
-// }
 
 void update_gl_primitives(AppState &as) {
     float scale = as.xdiv * 0.4f;
@@ -228,76 +142,6 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
-std::optional<Audio> load_ogg(const char *path, float volume=1.0f) {
-    // NOTE: Can't use fopen on files inside an Android APK.
-    // SDL provides IO abstraction for this.
-    size_t data_size;
-    uint8_t *data = static_cast<uint8_t*>(SDL_LoadFile(path, &data_size));
-
-    if (!data) {
-        debug("Failed to open file '%s'.", path);
-        return {};
-    }
-
-    Audio ret;
-
-    short *output;
-    int samples = stb_vorbis_decode_memory(data, data_size, &ret.spec.channels, &ret.spec.freq, &output);
-  
-    ret.data.resize(samples * sizeof(short));
-    memcpy(ret.data.data(), output, ret.data.size());
-
-    free(output);
-    SDL_free(data);
-
-    ret.spec.format = SDL_AUDIO_S16LE;
-
-    ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
-
-    if (!ret.stream) {
-        debug("Couldn't create audio stream: %s", SDL_GetError());
-        return {};
-    }
-
-    if (volume > 0.0f && volume < 1.0f) {
-        std::vector<uint8_t> tmp(ret.data.size());
-        SDL_MixAudio(tmp.data(), ret.data.data(), ret.spec.format, ret.data.size(), volume);
-        ret.data.swap(tmp);
-    }
-
-    return ret;
-}
-
-std::optional<Audio> load_wav(const char *path, float volume=1.0f) {
-    Audio ret;
-
-    uint8_t *data = nullptr;
-    uint32_t data_len;
-
-    if (!SDL_LoadWAV(path, &ret.spec, &data, &data_len)) {
-        debug("Couldn't load .wav file: %s", path);
-        return {};
-    }
-
-    ret.data.assign(data, data + data_len);
-    SDL_free(data);
-
-    ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
-
-    if (!ret.stream) {
-        debug("Couldn't create audio stream: %s", SDL_GetError());
-        return {};
-    }
-
-    if (volume > 0.0f && volume < 1.0f) {
-        std::vector<uint8_t> tmp(ret.data.size());
-        SDL_MixAudio(tmp.data(), ret.data.data(), ret.spec.format, ret.data.size(), volume);
-        ret.data.swap(tmp);
-    }
-
-    return ret;
-}
-
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         debug("SDL_Init failed: %s", SDL_GetError());
@@ -317,7 +161,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 #ifdef __ANDROID__
     base_path = "";
 #endif
-
 
     if (auto w = load_ogg((base_path + "bgm.ogg").c_str(), 0.1)) {
         as->bgm = *w;
@@ -352,9 +195,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->gl_ctx = SDL_GL_CreateContext(as->window);
     SDL_GL_MakeCurrent(as->window, as->gl_ctx);
 #endif
-
-    // glEnable(GL_DEBUG_OUTPUT);
-    // glDebugMessageCallback(gl_debug_callback, 0);
 
     as->v_shader = glCreateShader(GL_VERTEX_SHADER);
     as->f_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -523,14 +363,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
             as.selected_shape = -1;
 
-            int done = 0;
-            for (auto a: as.shape_done) {
-                if (a) {
-                    done++;
-                }
-            }
-
-            if (done == NUM_SHAPES) {
+            // check if we completed the game
+            auto is_true = [](bool b) { return b; };
+            if (std::all_of(as.shape_done.begin(), as.shape_done.end(), is_true)) {
                 init_game(as);
             }
 

@@ -9,7 +9,12 @@ LOCAL_SRC_FILES := \
     main.cpp \
     geometry.cpp \
     geometry.hpp \
-	minivorbis.hpp
+    stb_vorbis.cpp \
+    stb_vorbis.hpp \
+    audio.cpp \
+    audio.hpp \
+    shader.hpp \
+    debug.hpp
 
 SDL_PATH := ../SDL  # SDL
 

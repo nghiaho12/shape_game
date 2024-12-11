@@ -60,7 +60,7 @@ GLPrimitive make_gl_primitive(const VertexIndex &vi, const glm::vec4 &color);
 void free_gl_primitive(GLPrimitive &p);
 void draw_gl_primitive(GLuint program, const GLPrimitive &p);
 
-Shape make_shape( int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
+Shape make_shape(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
 
 // Create all shapes for the duration of the game.
 // All shapes are normalized to radius of 1.0 unit and scaled according to screen size.
