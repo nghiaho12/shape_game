@@ -11,7 +11,6 @@
 #include <glm/mat4x4.hpp> 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <iostream>
 #include <vector>
 #include <cmath>
 #include <cstdio>
@@ -151,7 +150,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     AppState *as = new AppState();
     
     if (!as) {
-        std::cerr << "can't alloc memory for AppState\n";
+        debug("can't alloc memory for AppState");
         return SDL_APP_FAILURE;
     }
 
@@ -233,7 +232,7 @@ bool recalc_drawing_area(AppState &as) {
     int win_w, win_h;
 
     if (!SDL_GetWindowSize(as.window, &win_w, &win_h)) {
-        std::cerr << SDL_GetError() << "\n";
+        debug("%s", SDL_GetError());
         return false;
     }
 
@@ -467,7 +466,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    SDL_GL_SetSwapInterval(1);
     SDL_GL_SwapWindow(as.window);
 
     return SDL_APP_CONTINUE;
