@@ -43,9 +43,10 @@ docker run --rm --network=host shape_game_android
 Point your browser to http://localhost:8000 on your Android device and download the APK.
 
 # Credits
-Assets 
+Sound assets 
 - https://opengameart.org/content/fun-a-bgm-track
 - https://opengameart.org/content/6-user-interface-ding-clicks
+- https://opengameart.org/content/well-done
 
 Ogg Vorbis decoder
  - https://github.com/nothings/stb

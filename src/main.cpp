@@ -1,3 +1,4 @@
+#include <SDL3/SDL_init.h>
 #define SDL_MAIN_USE_CALLBACKS // use the callbacks instead of main() 
 #define GL_GLEXT_PROTOTYPES
 
@@ -72,6 +73,7 @@ struct AppState {
     SDL_AudioDeviceID audio_device = 0;
     Audio bgm;
     Audio sfx_correct;
+    Audio sfx_win;
 
     bool shader_init = false;
     GLuint v_shader = 0;
@@ -167,6 +169,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         return SDL_APP_FAILURE;
     }
 
+    if (auto w = load_ogg((base_path + "win.ogg").c_str())) {
+        as->sfx_win = *w;
+    } else {
+        return SDL_APP_FAILURE;
+    }
+
     if (auto w = load_wav((base_path + "ding.wav").c_str())) {
         as->sfx_correct = *w;
     } else {
@@ -188,7 +196,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
         LOG("SDL_CreateWindowAndRenderer failed");
+        return SDL_APP_FAILURE;
     }    
+
+    if (!SDL_SetRenderVSync(as->renderer, 1)) {
+        LOG("SDL_SetRenderVSync failed");
+        return SDL_APP_FAILURE;
+    }
 
 #ifndef __EMSCRIPTEN__
     as->gl_ctx = SDL_GL_CreateContext(as->window);
@@ -362,9 +376,12 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
             as.selected_shape = -1;
 
-            // check if we completed the game
+            // check if we won
             auto is_true = [](bool b) { return b; };
             if (std::all_of(as.shape_done.begin(), as.shape_done.end(), is_true)) {
+                SDL_PutAudioStreamData(as.sfx_win.stream, as.sfx_win.data.data(), as.sfx_win.data.size());
+                SDL_ResumeAudioStreamDevice(as.sfx_win.stream);
+
                 init_game(as);
             }
 
@@ -424,8 +441,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     draw_gl_primitive(as.program, as.bg);
 
-    float dt = (SDL_GetTicks() - as.last_tick) * 1e-3f;
-    as.last_tick = SDL_GetTicks();
+    float dt = (SDL_GetTicksNS() - as.last_tick) * 1e-9f;
+    as.last_tick = SDL_GetTicksNS();
 
     for (int i=0; i < static_cast<int>(as.shape.size()); i++) {
         auto &s = as.shape[i];
