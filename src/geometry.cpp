@@ -4,6 +4,24 @@
 #include <algorithm>
 #include <random>
 
+void Shape::set_trans(const glm::vec2 &trans) {
+    line.trans = trans;
+    line_highlight.trans = trans;
+    fill.trans = trans;
+}
+
+void Shape::set_scale(float scale) {
+    line.scale = scale;
+    line_highlight.scale = scale;
+    fill.scale = scale;
+}
+
+void Shape::set_theta(float theta) {
+    line.theta = theta;
+    line_highlight.theta = theta;
+    fill.theta = theta;
+}
+
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius) {
     std::vector<glm::vec2> vert;
 

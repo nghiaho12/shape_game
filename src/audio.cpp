@@ -1,10 +1,47 @@
 #include "audio.hpp"
 #include "log.hpp"
 #include "stb_vorbis.hpp"
-
+#include <SDL3/SDL_audio.h>
+#include <cstdint>
 #include <cstdlib>
 
-std::optional<Audio> load_ogg(const char *path, float volume) {
+void Audio::play() {
+    if (stream) {
+        SDL_PutAudioStreamData(stream, data.data(), data.size());
+        SDL_ResumeAudioStreamDevice(stream);
+    }
+}
+
+namespace {
+std::vector<uint8_t> change_volume(const std::vector<uint8_t> &data, SDL_AudioSpec spec, float volume) {
+    std::vector<uint8_t> ret(data.size());
+    SDL_MixAudio(ret.data(), data.data(), spec.format, data.size(), volume);
+    return ret;
+}
+
+bool load_stream(SDL_AudioDeviceID audio_device, Audio &audio, float volume) {
+    audio.stream = SDL_CreateAudioStream(&audio.spec, NULL);
+
+    if (!audio.stream) {
+        LOG("Couldn't create audio stream: %s", SDL_GetError());
+        return false;
+    }
+
+    if (!SDL_BindAudioStream(audio_device, audio.stream)) { 
+        LOG("Failed to bind stream to device: %s", SDL_GetError());
+        return false;
+    }
+
+    if (volume > 0.0f && volume < 1.0f) {
+        audio.data = change_volume(audio.data, audio.spec, volume);
+    }
+
+    return true;
+}
+
+}
+
+std::optional<Audio> load_ogg(SDL_AudioDeviceID audio_device, const char *path, float volume) {
     // NOTE: Can't use fopen on files inside an Android APK.
     // SDL provides IO abstraction for this.
     size_t data_size;
@@ -28,48 +65,29 @@ std::optional<Audio> load_ogg(const char *path, float volume) {
 
     ret.spec.format = SDL_AUDIO_S16LE;
 
-    ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
-
-    if (!ret.stream) {
-        LOG("Couldn't create audio stream: %s", SDL_GetError());
+    if (!load_stream(audio_device, ret, volume)) {
         return {};
-    }
-
-
-    if (volume > 0.0f && volume < 1.0f) {
-        std::vector<uint8_t> tmp(ret.data.size());
-        SDL_MixAudio(tmp.data(), ret.data.data(), ret.spec.format, ret.data.size(), volume);
-        ret.data.swap(tmp);
     }
 
     return ret;
 }
 
-std::optional<Audio> load_wav(const char *path, float volume) {
+std::optional<Audio> load_wav(SDL_AudioDeviceID audio_device, const char *path, float volume) {
     Audio ret;
 
     uint8_t *data = nullptr;
     uint32_t data_len;
 
     if (!SDL_LoadWAV(path, &ret.spec, &data, &data_len)) {
-        LOG("Couldn't load .wav file: %s", path);
+        LOG("Failed to open file '%s'.", path);
         return {};
     }
 
     ret.data.assign(data, data + data_len);
     SDL_free(data);
 
-    ret.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &ret.spec, NULL, NULL);
-
-    if (!ret.stream) {
-        LOG("Couldn't create audio stream: %s", SDL_GetError());
+    if (!load_stream(audio_device, ret, volume)) {
         return {};
-    }
-
-    if (volume > 0.0f && volume < 1.0f) {
-        std::vector<uint8_t> tmp(ret.data.size());
-        SDL_MixAudio(tmp.data(), ret.data.data(), ret.spec.format, ret.data.size(), volume);
-        ret.data.swap(tmp);
     }
 
     return ret;

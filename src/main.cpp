@@ -65,15 +65,15 @@ std::map<std::string, glm::vec4> tableau10_palette() {
     return ret;
 }
 
+enum class AudioEnum {BGM, CORRECT, WIN};
+
 struct AppState {
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
     SDL_GLContext gl_ctx;
 
     SDL_AudioDeviceID audio_device = 0;
-    Audio bgm;
-    Audio sfx_correct;
-    Audio sfx_win;
+    std::map<AudioEnum, Audio> audio;
 
     bool shader_init = false;
     GLuint v_shader = 0;
@@ -163,29 +163,28 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     base_path = "";
 #endif
 
-    if (auto w = load_ogg((base_path + "bgm.ogg").c_str(), 0.1)) {
-        as->bgm = *w;
-    } else {
-        return SDL_APP_FAILURE;
-    }
-
-    if (auto w = load_ogg((base_path + "win.ogg").c_str())) {
-        as->sfx_win = *w;
-    } else {
-        return SDL_APP_FAILURE;
-    }
-
-    if (auto w = load_wav((base_path + "ding.wav").c_str())) {
-        as->sfx_correct = *w;
-    } else {
-        return SDL_APP_FAILURE;
-    }
-
-    SDL_ResumeAudioStreamDevice(as->bgm.stream);
-
     as->audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
     if (as->audio_device == 0) {
         LOG("Couldn't open audio device: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    if (auto w = load_ogg(as->audio_device, (base_path + "bgm.ogg").c_str(), 0.1)) {
+        as->audio[AudioEnum::BGM] = *w;
+        
+    } else {
+        return SDL_APP_FAILURE;
+    }
+
+    if (auto w = load_ogg(as->audio_device, (base_path + "win.ogg").c_str())) {
+        as->audio[AudioEnum::WIN] = *w;
+    } else {
+        return SDL_APP_FAILURE;
+    }
+
+    if (auto w = load_wav(as->audio_device, (base_path + "ding.wav").c_str())) {
+        as->audio[AudioEnum::CORRECT] = *w;
+    } else {
         return SDL_APP_FAILURE;
     }
 
@@ -368,9 +367,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
                 if (as.shape_dst[as.selected_shape] == dst_idx) {
                     as.shape_done[as.selected_shape] = true;
-
-                    SDL_PutAudioStreamData(as.sfx_correct.stream, as.sfx_correct.data.data(), as.sfx_correct.data.size());
-                    SDL_ResumeAudioStreamDevice(as.sfx_correct.stream);
+                    as.audio[AudioEnum::CORRECT].play();
                 }
             }
 
@@ -379,9 +376,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             // check if we won
             auto is_true = [](bool b) { return b; };
             if (std::all_of(as.shape_done.begin(), as.shape_done.end(), is_true)) {
-                SDL_PutAudioStreamData(as.sfx_win.stream, as.sfx_win.data.data(), as.sfx_win.data.size());
-                SDL_ResumeAudioStreamDevice(as.sfx_win.stream);
-
+                as.audio[AudioEnum::WIN].play();
                 init_game(as);
             }
 
@@ -393,6 +388,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+    LOG("QUIT");
     if (appstate) {
         AppState &as = *static_cast<AppState*>(appstate);
         SDL_DestroyRenderer(as.renderer);
@@ -405,6 +401,15 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
         glDeleteVertexArraysOES(1, &as.vao);
 
+        SDL_CloseAudioDevice(as.audio_device);
+
+        // TODO: This code causes a crash as of libSDL preview-3.1.6
+        // for (auto &a: as.audio) {
+        //     if (a.second.stream) {
+        //         SDL_DestroyAudioStream(a.second.stream);
+        //     }
+        // }
+
         delete &as;
     }
 }
@@ -413,8 +418,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState &as = *static_cast<AppState*>(appstate);
 
-    if (SDL_GetAudioStreamAvailable(as.bgm.stream) < static_cast<int>(as.bgm.data.size())) {
-        SDL_PutAudioStreamData(as.bgm.stream, as.bgm.data.data(), as.bgm.data.size());
+    auto &bgm = as.audio[AudioEnum::BGM];
+    if (SDL_GetAudioStreamAvailable(bgm.stream) < static_cast<int>(bgm.data.size())) {
+        bgm.play();
     }
 
 #ifndef __EMSCRIPTEN__

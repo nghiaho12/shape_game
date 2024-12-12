@@ -15,11 +15,11 @@ struct VertexIndex {
 
 // Wrapper for GL_TRIANGLES
 struct GLPrimitive {
-    GLuint vbo_vertex;
-    GLuint vbo_index;
-    int index_count;
-    glm::vec4 color;
-    glm::vec2 trans{0.0f, 0.0f};
+    GLuint vbo_vertex = 0;
+    GLuint vbo_index = 0;
+    int index_count = 0;
+    glm::vec4 color{};
+    glm::vec2 trans{};
     float scale = 1.0f;
     float theta = 0.0f; // rotation in radians
 };
@@ -32,23 +32,9 @@ struct Shape {
     GLPrimitive line_highlight;
     GLPrimitive fill;
 
-    void set_trans(const glm::vec2 &trans) {
-        line.trans = trans;
-        line_highlight.trans = trans;
-        fill.trans = trans;
-    }
-
-    void set_scale(float scale) {
-        line.scale = scale;
-        line_highlight.scale = scale;
-        fill.scale = scale;
-    }
-
-    void set_theta(float theta) {
-        line.theta = theta;
-        line_highlight.theta = theta;
-        fill.theta = theta;
-    }
+    void set_trans(const glm::vec2 &trans);
+    void set_scale(float scale);
+    void set_theta(float theta);
 };
 
 // Low level functions to create polygon vertex and index.
