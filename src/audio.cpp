@@ -20,7 +20,7 @@ std::optional<Audio> load_ogg(const char *path, float volume) {
     short *output;
     int samples = stb_vorbis_decode_memory(data, data_size, &ret.spec.channels, &ret.spec.freq, &output);
   
-    ret.data.resize(samples * sizeof(short));
+    ret.data.resize(samples * ret.spec.channels * sizeof(short));
     memcpy(ret.data.data(), output, ret.data.size());
 
     free(output);
