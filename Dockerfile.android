@@ -49,10 +49,22 @@ RUN cd /SDL/build/org.libsdl.shape_game/app/jni/src && \
 # RUN cd /SDL/build/org.libsdl.shape_game/app && \
 #     sed -i "s/abiFilters 'arm64-v8a'/abiFilters 'arm64-v8a','x86_64'/g" build.gradle
 
+# For resizing icon
+RUN apt install -y imagemagick
+
 # Build our actual project
 COPY Android.mk /SDL/build/org.libsdl.shape_game/app/jni/src
 COPY src /SDL/build/org.libsdl.shape_game/app/jni/src/
 COPY assets /SDL/build/org.libsdl.shape_game/app/src/main/assets/
+COPY res/values /SDL/build/org.libsdl.shape_game/app/src/main/res/values/
+COPY res/ic_launcher.png /
+
+RUN cd /SDL/build/org.libsdl.shape_game/app/src/main/res && \
+    cp /ic_launcher.png mipmap-xxxhdpi/ && \
+    convert -resize 144 /ic_launcher.png mipmap-xxhdpi/ic_launcher.png && \
+    convert -resize 96 /ic_launcher.png mipmap-xhdpi/ic_launcher.png && \
+    convert -resize 72 /ic_launcher.png mipmap-hdpi/ic_launcher.png && \
+    convert -resize 48 /ic_launcher.png mipmap-mdpi/ic_launcher.png
 
 RUN cd /SDL/build/org.libsdl.shape_game && \
     ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=/android-ndk-r27c ./gradlew assembleDebug
