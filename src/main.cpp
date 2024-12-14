@@ -1,4 +1,3 @@
-#include <SDL3/SDL_init.h>
 #define SDL_MAIN_USE_CALLBACKS // use the callbacks instead of main() 
 #define GL_GLEXT_PROTOTYPES
 
@@ -26,10 +25,12 @@
 #include <emscripten/html5.h>
 #endif
 
+#include "log.hpp"
 #include "geometry.hpp"
 #include "audio.hpp"
 #include "shader.hpp"
-#include "log.hpp"
+#include "font.hpp"
+
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
@@ -74,6 +75,9 @@ struct AppState {
 
     SDL_AudioDeviceID audio_device = 0;
     std::map<AudioEnum, Audio> audio;
+
+    FontAtlas font;
+    GLPrimitive letter;
 
     bool shader_init = false;
     GLuint v_shader = 0;
@@ -143,6 +147,18 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
+static void debug_callback(GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam) {
+    LOG("GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           ( type == GL_DEBUG_TYPE_ERROR_KHR ? "** GL ERROR **" : "" ),
+            type, severity, message );
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         LOG("SDL_Init failed: %s", SDL_GetError());
@@ -208,6 +224,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_GL_MakeCurrent(as->window, as->gl_ctx);
 #endif
 
+    glEnable(GL_DEBUG_OUTPUT_KHR);
+    glDebugMessageCallbackKHR(debug_callback, 0);
+
     as->v_shader = glCreateShader(GL_VERTEX_SHADER);
     as->f_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
@@ -237,6 +256,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     init_game(*as);
 
     as->last_tick = SDL_GetTicks();
+
+    if (auto font = load_font("/home/nghia/Downloads/msdf-atlas-gen/atlas.bmp")) {
+        as->font = *font;
+    } else {
+        return SDL_APP_FAILURE;
+    }
 
     return SDL_APP_CONTINUE;
 }
@@ -270,7 +295,12 @@ bool recalc_drawing_area(AppState &as) {
 
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
+    
+    glUseProgram(as.program);
     glUniformMatrix4fv(glGetUniformLocation(as.program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+//
+    glUseProgram(as.font.program);
+    glUniformMatrix4fv(glGetUniformLocation(as.font.program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
 
     return true;
 }
@@ -386,9 +416,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void *appstate, SDL_AppResult result)
-{
-    LOG("QUIT");
+void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     if (appstate) {
         AppState &as = *static_cast<AppState*>(appstate);
         SDL_DestroyRenderer(as.renderer);
@@ -418,6 +446,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState &as = *static_cast<AppState*>(appstate);
 
+    float dt = (SDL_GetTicksNS() - as.last_tick) * 1e-9f;
+    as.last_tick = SDL_GetTicksNS();
+
     auto &bgm = as.audio[AudioEnum::BGM];
     if (SDL_GetAudioStreamAvailable(bgm.stream) < static_cast<int>(bgm.data.size())) {
         bgm.play();
@@ -446,9 +477,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GetMouseState(&cx, &cy);
 
     draw_gl_primitive(as.program, as.bg);
-
-    float dt = (SDL_GetTicksNS() - as.last_tick) * 1e-9f;
-    as.last_tick = SDL_GetTicksNS();
 
     for (int i=0; i < static_cast<int>(as.shape.size()); i++) {
         auto &s = as.shape[i];
@@ -489,6 +517,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
+    draw_letter(as.font, 0, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'N'); 
+    draw_letter(as.font, 100, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'g'); 
     SDL_GL_SwapWindow(as.window);
 
     return SDL_APP_CONTINUE;

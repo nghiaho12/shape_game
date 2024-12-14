@@ -19,6 +19,9 @@ add_executable(${EXECUTABLE_NAME}
     src/stb_vorbis.hpp
     src/audio.cpp
     src/audio.hpp
+    src/font.cpp
+    src/font.hpp
+    src/shader.cpp
     src/shader.hpp
     src/log.hpp
 )

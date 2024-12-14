@@ -1,4 +1,5 @@
 #include "geometry.hpp"
+#include <GLES2/gl2.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -140,11 +141,11 @@ GLPrimitive make_gl_primitive(const VertexIndex &vi, const glm::vec4 &color) {
 
     glGenBuffers(1, &ret.vbo_vertex);
     glBindBuffer(GL_ARRAY_BUFFER, ret.vbo_vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*vi.vertex.size(), vi.vertex.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*vi.vertex.size(), vi.vertex.data(), GL_DYNAMIC_DRAW);
 
     glGenBuffers(1, &ret.vbo_index);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ret.vbo_index);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::vec2)*vi.index.size(), vi.index.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*vi.index.size(), vi.index.data(), GL_STATIC_DRAW);
 
     ret.index_count = vi.index.size();
     ret.color = color;
@@ -165,6 +166,8 @@ void free_gl_primitive(GLPrimitive &p) {
 }
 
 void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
+    glUseProgram(program);
+
     glUniform1f(glGetUniformLocation(program, "scale"), p.scale);
     glUniform1f(glGetUniformLocation(program, "theta"), p.theta);
     glUniform2fv(glGetUniformLocation(program, "trans"), 1, &p.trans[0]);

@@ -13,6 +13,7 @@ LOCAL_SRC_FILES := \
     stb_vorbis.hpp \
     audio.cpp \
     audio.hpp \
+    shader.cpp \
     shader.hpp \
     log.hpp
 

@@ -2,8 +2,8 @@
 
 #include <SDL3/SDL_opengles2.h>
 #include <cstring>
-#include <vector>
-#include "log.hpp"
+
+bool compile_shader(GLuint s, const char *shader);
 
 static const char *vertex_shader = R"(#version 300 es
 precision mediump float;
@@ -34,29 +34,4 @@ out vec4 o_color;
 void main() {
     o_color = v_color;
 })";
-
-bool compile_shader(GLuint s, const char *shader) {
-    int length = strlen(shader);
-    glShaderSource(s, 1, static_cast<const GLchar**>(&shader), &length);
-    glCompileShader(s);
-
-    GLint status;
-    glGetShaderiv(s, GL_COMPILE_STATUS, &status);
-
-    if (status == GL_FALSE) {
-        GLint len = 0;
-        glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
-
-        std::vector<GLchar> error(len);
-        glGetShaderInfoLog(s, len, &len, error.data());
-
-        if (len > 0) {
-            LOG("compile_shder error: %s", error.data());
-        }
-
-        return false;
-    }
-
-    return true;
-}
 

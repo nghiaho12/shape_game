@@ -15,6 +15,7 @@ struct VertexIndex {
 
 // Wrapper for GL_TRIANGLES
 struct GLPrimitive {
+    GLuint tex = 0;
     GLuint vbo_vertex = 0;
     GLuint vbo_index = 0;
     int index_count = 0;
