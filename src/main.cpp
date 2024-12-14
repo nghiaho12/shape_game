@@ -257,9 +257,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     as->last_tick = SDL_GetTicks();
 
-    if (auto font = load_font("/home/nghia/Downloads/msdf-atlas-gen/atlas.bmp")) {
-        as->font = *font;
-    } else {
+    if (!as->font.load("/home/nghia/Downloads/msdf-atlas-gen/atlas.bmp")) {
         return SDL_APP_FAILURE;
     }
 
@@ -517,8 +515,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    draw_letter(as.font, 0, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'N'); 
-    draw_letter(as.font, 100, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'g'); 
+    as.font.draw_letter(0, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'N'); 
+    as.font.draw_letter(100, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'g'); 
+
     SDL_GL_SwapWindow(as.window);
 
     return SDL_APP_CONTINUE;

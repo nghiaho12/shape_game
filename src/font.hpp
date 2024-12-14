@@ -27,8 +27,8 @@ struct FontAtlas {
     static constexpr float distance_range = 2.0f;
     static constexpr float glyph_size = 32.875f;
 
-    bool load_font(const char *bmp_path);
+    bool load(const char *bmp_path);
+    std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);
+    void draw_letter(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, char ch);
 };
 
-std::pair<glm::vec2, glm::vec2> get_char_uv(const FontAtlas &font, char ch);
-void draw_letter(const FontAtlas &font, float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, char ch);

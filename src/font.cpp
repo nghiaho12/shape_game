@@ -44,7 +44,7 @@ void main() {
 })";
 }
 
-bool FontAtlas::load_font(const char *bmp_path) {
+bool FontAtlas::load(const char *bmp_path) {
     v_shader = glCreateShader(GL_VERTEX_SHADER);
     f_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
@@ -95,27 +95,27 @@ bool FontAtlas::load_font(const char *bmp_path) {
     return true;
 }
 
-std::pair<glm::vec2, glm::vec2> get_char_uv(const FontAtlas &font, char ch) {
+std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
     // Assume character set from ascii 33 to 126
     int idx = ch - 33;
 
-    int row = idx / font.cols;
-    int col = idx % font.cols;
+    int row = idx / cols;
+    int col = idx % cols;
 
-    float u = 1.f*col / font.cols;
-    float v = 1.f*row / font.rows;
+    float u = 1.f*col / cols;
+    float v = 1.f*row / rows;
 
     glm::vec2 start{u, v};
-    glm::vec2 end = start + glm::vec2{1.f*font.grid_w/font.tex_w, 1.f*font.grid_h/font.tex_h};
+    glm::vec2 end = start + glm::vec2{1.f*grid_w/tex_w, 1.f*grid_h/tex_h};
 
     return {start, end};
 }
 
-void draw_letter(const FontAtlas &font, float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, char ch) {
-    auto [start, end] = get_char_uv(font, ch);
+void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, char ch) {
+    auto [start, end] = get_char_uv(ch);
 
-    float w = font.grid_w * scale;
-    float h = font.grid_h * scale;
+    float w = grid_w * scale;
+    float h = grid_h * scale;
 
     // pos + uv
     std::vector<float> vert{
@@ -125,16 +125,16 @@ void draw_letter(const FontAtlas &font, float x, float y, float scale, const glm
         x, y + h, start.x, end.y,
     };
 
-    glUseProgram(font.program);
-    glUniform4fv(glGetUniformLocation(font.program, "bgColor"), 1, &bg[0]);
-    glUniform4fv(glGetUniformLocation(font.program, "fgColor"), 1, &fg[0]);
-    glUniform1i(glGetUniformLocation(font.program, "msdf"), 0); // set it manually
-    glUniform1f(glGetUniformLocation(font.program, "screenPxRange"), font.distance_range * scale); // set it manually
+    glUseProgram(program);
+    glUniform4fv(glGetUniformLocation(program, "bgColor"), 1, &bg[0]);
+    glUniform4fv(glGetUniformLocation(program, "fgColor"), 1, &fg[0]);
+    glUniform1i(glGetUniformLocation(program, "msdf"), 0); // set it manually
+    glUniform1f(glGetUniformLocation(program, "screenPxRange"), distance_range * scale); // set it manually
 
-    glBindBuffer(GL_ARRAY_BUFFER, font.letter.vbo_vertex);
+    glBindBuffer(GL_ARRAY_BUFFER, letter.vbo_vertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*vert.size(), vert.data());
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, font.letter.vbo_index);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, letter.vbo_index);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
@@ -142,8 +142,8 @@ void draw_letter(const FontAtlas &font, float x, float y, float scale, const glm
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2 * sizeof(float)));
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font.tex);
-    glDrawElements(GL_TRIANGLES, font.letter.index_count, GL_UNSIGNED_INT, 0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glDrawElements(GL_TRIANGLES, letter.index_count, GL_UNSIGNED_INT, 0);
 }
 
 
