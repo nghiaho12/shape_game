@@ -1,3 +1,4 @@
+#define GL_GLEXT_PROTOTYPES
 #include "gl_helper.hpp"
 #include "log.hpp"
 #include <SDL3/SDL_surface.h>
@@ -30,7 +31,25 @@ bool compile_shader(GLuint s, const char *shader) {
 
     return true;
 }
+
+void debug_callback(GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam) {
+    LOG("GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           ( type == GL_DEBUG_TYPE_ERROR_KHR ? "** GL ERROR **" : "" ),
+            type, severity, message );
+}
+
 } // namespace
+
+void enable_gl_debug_callback() {
+    glEnable(GL_DEBUG_OUTPUT_KHR);
+    glDebugMessageCallbackKHR(debug_callback, 0);
+}
 
 void Shader::use() {
     glUseProgram(program);

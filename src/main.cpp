@@ -147,18 +147,6 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
-static void debug_callback(GLenum source,
-    GLenum type,
-    GLuint id,
-    GLenum severity,
-    GLsizei length,
-    const GLchar* message,
-    const void* userParam) {
-    LOG("GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-           ( type == GL_DEBUG_TYPE_ERROR_KHR ? "** GL ERROR **" : "" ),
-            type, severity, message );
-}
-
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         LOG("SDL_Init failed: %s", SDL_GetError());
@@ -224,8 +212,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_GL_MakeCurrent(as->window, as->gl_ctx);
 #endif
 
-    glEnable(GL_DEBUG_OUTPUT_KHR);
-    glDebugMessageCallbackKHR(debug_callback, 0);
+    enable_gl_debug_callback();
 
     as->shape_shader = make_shape_shader();
 
@@ -496,8 +483,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    as.font.draw_letter(0, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'N'); 
-    as.font.draw_letter(100, 0, 2.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), 'g'); 
+    as.font.draw_string(0, 0, 4.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), "Nghia"); 
 
     SDL_GL_SwapWindow(as.window);
 

@@ -11,11 +11,6 @@
 
 #include "gl_helper.hpp"
 
-struct VertexIndex {
-    std::vector<glm::vec2> vertex;
-    std::vector<uint32_t> index;
-};
-
 // Wrapper for GL_TRIANGLES
 struct GLPrimitive {
     GLPrimitive() : 
@@ -45,17 +40,14 @@ struct Shape {
     void set_theta(float theta);
 };
 
+struct VertexIndex {
+    std::vector<glm::vec2> vertex;
+    std::vector<uint32_t> index;
+};
+
 ShaderPtr make_shape_shader();
 
-// Low level functions to create polygon vertex and index.
-std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius);
-VertexIndex make_fill(const std::vector<glm::vec2> &vert);
-VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness);
-
-Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
-Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
-
-// Create all shapes for the duration of the game.
+// Create all possible shapes for the game.
 // All shapes are normalized to radius of 1.0 unit and scaled according to screen size.
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette);
 

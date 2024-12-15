@@ -1,6 +1,5 @@
 #include "geometry.hpp"
 #include "gl_helper.hpp"
-#include <GLES2/gl2.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -35,29 +34,6 @@ out vec4 o_color;
 void main() {
     o_color = v_color;
 })";
-} // namespace MyNamespace {
-    
-ShaderPtr make_shape_shader() {
-    return make_shader(vertex_shader, fragment_shader);
-}
-
-void Shape::set_trans(const glm::vec2 &trans) {
-    line.trans = trans;
-    line_highlight.trans = trans;
-    fill.trans = trans;
-}
-
-void Shape::set_scale(float scale) {
-    line.scale = scale;
-    line_highlight.scale = scale;
-    fill.scale = scale;
-}
-
-void Shape::set_theta(float theta) {
-    line.theta = theta;
-    line_highlight.theta = theta;
-    fill.theta = theta;
-}
 
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius) {
     std::vector<glm::vec2> vert;
@@ -172,31 +148,6 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     return {tri_pts, tri_idx};
 }
 
-void GLPrimitive::draw(const ShaderPtr &shader) {
-    shader->use();
-
-    glUniform1f(shader->get_loc("scale"), scale);
-    glUniform1f(shader->get_loc("theta"), theta);
-    glUniform2fv(shader->get_loc("trans"), 1, &trans[0]);
-    glUniform4fv(shader->get_loc("color"), 1, &color[0]);
-
-    vertex_buffer->bind();
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-    vertex_buffer->draw();
-}
-  
-Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
-    std::vector<glm::vec2> vert = make_polygon(sides, radius);
-
-    Shape s= make_shape(vert, line_thickness, line_color, fill_color);
-    s.radius = *std::max_element(radius.begin(), radius.end());
-
-    return s;
-}
-
 Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
     Shape shape;
     {
@@ -220,6 +171,15 @@ Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const
     return shape;
 }
 
+Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+    std::vector<glm::vec2> vert = make_polygon(sides, radius);
+
+    Shape s= make_shape(vert, line_thickness, line_color, fill_color);
+    s.radius = *std::max_element(radius.begin(), radius.end());
+
+    return s;
+}
+
 Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
     Shape shape;
 
@@ -240,6 +200,24 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     return make_shape(vert, line_thickness, line_color, fill_color);
 }
 
+} // namespace 
+  
+void GLPrimitive::draw(const ShaderPtr &shader) {
+    shader->use();
+
+    glUniform1f(shader->get_loc("scale"), scale);
+    glUniform1f(shader->get_loc("theta"), theta);
+    glUniform2fv(shader->get_loc("trans"), 1, &trans[0]);
+    glUniform4fv(shader->get_loc("color"), 1, &color[0]);
+
+    vertex_buffer->bind();
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+    vertex_buffer->draw();
+}
+  
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
     // All shapes have a normalized radius of 1.0 unit
     
@@ -281,3 +259,24 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     return ret;
 }
 
+ShaderPtr make_shape_shader() {
+    return make_shader(vertex_shader, fragment_shader);
+}
+
+void Shape::set_trans(const glm::vec2 &trans) {
+    line.trans = trans;
+    line_highlight.trans = trans;
+    fill.trans = trans;
+}
+
+void Shape::set_scale(float scale) {
+    line.scale = scale;
+    line_highlight.scale = scale;
+    fill.scale = scale;
+}
+
+void Shape::set_theta(float theta) {
+    line.theta = theta;
+    line_highlight.theta = theta;
+    fill.theta = theta;
+}

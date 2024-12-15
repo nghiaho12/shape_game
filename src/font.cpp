@@ -117,4 +117,12 @@ void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, 
     letter->draw();
 }
 
+void FontAtlas::draw_string(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const std::string &str) {
+    int xidx = 0;
 
+    for (char ch: str) {
+        float xcur = x + grid_w*xidx*scale;
+        draw_letter(xcur, y, scale, fg, bg, ch);
+        xidx++;
+    }
+}

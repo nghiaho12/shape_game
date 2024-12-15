@@ -29,5 +29,6 @@ struct FontAtlas {
     bool load(const char *bmp_path);
     std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);
     void draw_letter(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, char ch);
+    void draw_string(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const std::string &str);
 };
 
