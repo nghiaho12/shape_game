@@ -1,9 +1,9 @@
 #include "geometry.hpp"
+#include "gl_helper.hpp"
 #include <GLES2/gl2.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
-#include <random>
 
 namespace {
 const char *vertex_shader = R"(#version 300 es
@@ -172,60 +172,50 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     return {tri_pts, tri_idx};
 }
 
-GLPrimitive make_gl_primitive(const VertexIndex &vi, const glm::vec4 &color) {
-    GLPrimitive ret;
+void GLPrimitive::draw(const ShaderPtr &shader) {
+    shader->use();
 
-    glGenBuffers(1, &ret.vbo_vertex);
-    glBindBuffer(GL_ARRAY_BUFFER, ret.vbo_vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*vi.vertex.size(), vi.vertex.data(), GL_DYNAMIC_DRAW);
+    glUniform1f(shader->get_loc("scale"), scale);
+    glUniform1f(shader->get_loc("theta"), theta);
+    glUniform2fv(shader->get_loc("trans"), 1, &trans[0]);
+    glUniform4fv(shader->get_loc("color"), 1, &color[0]);
 
-    glGenBuffers(1, &ret.vbo_index);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ret.vbo_index);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*vi.index.size(), vi.index.data(), GL_STATIC_DRAW);
+    vertex_buffer->bind();
 
-    ret.index_count = vi.index.size();
-    ret.color = color;
-
-    return ret;
-}
-
-void free_gl_primitive(GLPrimitive &p) {
-    if (p.vbo_vertex) {
-        glDeleteBuffers(1, &p.vbo_vertex);
-        p.vbo_vertex = 0;
-    }
-
-    if (p.vbo_index) {
-        glDeleteBuffers(1, &p.vbo_index);
-        p.vbo_index= 0;
-    }
-}
-
-void draw_gl_primitive(GLuint program, const GLPrimitive &p) {
-    glUseProgram(program);
-
-    glUniform1f(glGetUniformLocation(program, "scale"), p.scale);
-    glUniform1f(glGetUniformLocation(program, "theta"), p.theta);
-    glUniform2fv(glGetUniformLocation(program, "trans"), 1, &p.trans[0]);
-    glUniform4fv(glGetUniformLocation(program, "color"), 1, &p.color[0]);
-
-    glBindBuffer(GL_ARRAY_BUFFER, p.vbo_vertex);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p.vbo_index);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glDrawElements(GL_TRIANGLES, p.index_count, GL_UNSIGNED_INT, 0);
+
+    vertex_buffer->draw();
 }
   
-Shape make_shape(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
-    Shape shape;
-
-    shape.radius = *std::max_element(radius.begin(), radius.end());
-
+Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
     std::vector<glm::vec2> vert = make_polygon(sides, radius);
 
-    shape.fill = make_gl_primitive(make_fill(vert), fill_color);
-    shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
-    shape.line_highlight = make_gl_primitive(make_line(vert, line_thickness*2), line_color);
+    Shape s= make_shape(vert, line_thickness, line_color, fill_color);
+    s.radius = *std::max_element(radius.begin(), radius.end());
+
+    return s;
+}
+
+Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+    Shape shape;
+    {
+    auto[vertex, index] = make_fill(vert);
+    shape.fill.vertex_buffer = make_vertex_buffer(vertex, index);
+    shape.fill.color = fill_color;
+    }
+
+    {
+    auto[vertex, index] = make_line(vert, line_thickness);
+    shape.line.vertex_buffer = make_vertex_buffer(vertex, index);
+    shape.line.color = line_color;
+    }
+
+    {
+    auto[vertex, index] = make_line(vert, line_thickness*2);
+    shape.line_highlight.vertex_buffer = make_vertex_buffer(vertex, index);
+    shape.line_highlight.color = line_color;
+    }
 
     return shape;
 }
@@ -247,24 +237,18 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
         vert.push_back(glm::vec2{x, y});
     }
 
-    shape.fill = make_gl_primitive(make_fill(vert), fill_color);
-    shape.line = make_gl_primitive(make_line(vert, line_thickness), line_color);
-    shape.line_highlight = make_gl_primitive(make_line(vert, line_thickness*2), line_color);
-
-    return shape;
+    return make_shape(vert, line_thickness, line_color, fill_color);
 }
 
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
-    constexpr float line_thickness = 0.1f;
+    // All shapes have a normalized radius of 1.0 unit
+    
+    constexpr float line_thickness = 0.1f; // normalize
 
     std::vector<Shape> ret;
 
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::uniform_real_distribution<float> dice_radius(0.4, 1.0);
-
     int idx = 0;
-    auto next_Color = [&]() -> glm::vec4 {
+    auto next_color = [&]() -> glm::vec4 {
         auto it = palette.begin();
         std::advance(it, idx);
         idx = (idx + 1) % palette.size();
@@ -273,26 +257,26 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     };
 
     for (int sides=3; sides <= 8; sides++) {
-        Shape s = make_shape(sides, {1.f}, line_thickness, line_color, next_Color());
-        ret.push_back(s);
+        Shape s = make_shape_polygon(sides, {1.f}, line_thickness, line_color, next_color());
+        ret.push_back(std::move(s));
     }
 
-    Shape circle = make_shape(36, {1.f}, line_thickness, line_color, next_Color());
-    ret.push_back(circle);
+    Shape circle = make_shape_polygon(36, {1.f}, line_thickness, line_color, next_color());
+    ret.push_back(std::move(circle));
 
-    Shape oval = make_oval(1.f, line_thickness, line_color, next_Color());
-    ret.push_back(oval);
+    Shape oval = make_oval(1.f, line_thickness, line_color, next_color());
+    ret.push_back(std::move(oval));
 
     for (int i=0; i < 3; i++) {
-        Shape star = make_shape(8 + i*2, {1.0f, 0.5f}, line_thickness, line_color, next_Color());
-        ret.push_back(star);
+        Shape star = make_shape_polygon(8 + i*2, {1.0f, 0.5f}, line_thickness, line_color, next_color());
+        ret.push_back(std::move(star));
     }
 
-    Shape rhombus = make_shape(4, {1.0f, 0.5f}, line_thickness, line_color, next_Color());
-    ret.push_back(rhombus);
+    Shape rhombus = make_shape_polygon(4, {1.0f, 0.5f}, line_thickness, line_color, next_color());
+    ret.push_back(std::move(rhombus));
 
-    Shape crystal = make_shape(5, {1.0f, 0.5f, 0.5f, 0.5f, 0.5f}, line_thickness, line_color, next_Color());
-    ret.push_back(crystal);
+    Shape crystal = make_shape_polygon(5, {1.0f, 0.5f, 0.5f, 0.5f, 0.5f}, line_thickness, line_color, next_color());
+    ret.push_back(std::move(crystal));
 
     return ret;
 }

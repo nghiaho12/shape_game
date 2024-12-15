@@ -71,6 +71,7 @@ struct AppState {
     AppState() : 
         shape_shader({}, {}) {
     }
+
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
     SDL_GLContext gl_ctx;
@@ -97,7 +98,7 @@ struct AppState {
 
     ShaderPtr shape_shader;
     std::vector<Shape> shape_set;
-    std::array<Shape, NUM_SHAPES> shape;
+    std::array<Shape*, NUM_SHAPES> shape;
     std::array<int, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
     int selected_shape = -1;
@@ -110,7 +111,7 @@ void update_gl_primitives(AppState &as) {
     float scale = as.xdiv * 0.4f;
 
     for (auto &s: as.shape) {
-        s.set_scale(scale);
+        s->set_scale(scale);
     }
 }
 
@@ -123,13 +124,13 @@ void init_game(AppState &as) {
     std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
 
     for (int i=0; i < NUM_SHAPES; i++) {
-        as.shape[i] = as.shape_set[i];
+        as.shape[i] = &as.shape_set[i];
         as.shape_dst[i] = i;
 
         if (dice_binary(g) > 0.5) {
-            as.shape[i].rotation_direction = 1;
+            as.shape[i]->rotation_direction = 1;
         } else {
-            as.shape[i].rotation_direction = -1;
+            as.shape[i]->rotation_direction = -1;
         }
     }
 
@@ -235,7 +236,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // the area size is determined later
     std::vector<glm::vec2> empty(4);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
-    as->bg = make_gl_primitive({empty, index}, BG_COLOR);
+    as->bg.vertex_buffer = make_vertex_buffer(empty, index);
+    as->bg.color = BG_COLOR;
 
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
     init_game(*as);
@@ -289,15 +291,14 @@ bool recalc_drawing_area(AppState &as) {
 }
 
 void update_background(const AppState &as) {
-    std::array<glm::vec2, 4> bg;
+    std::vector<glm::vec2> bg(4);
 
     bg[0] = glm::vec2{as.xoff, as.yoff};
     bg[1] = glm::vec2{as.xoff + as.w, as.yoff};
     bg[2] = glm::vec2{as.xoff + as.w, as.yoff + as.h};
     bg[3] = glm::vec2{as.xoff, as.yoff + as.h};
-   
-    glBindBuffer(GL_ARRAY_BUFFER, as.bg.vbo_vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*4, bg.data());
+  
+    as.bg.vertex_buffer->update_vertex(bg);
 }
 
 glm::vec2 shape_index_to_src_pos(const AppState &as, int idx) {
@@ -326,7 +327,7 @@ int find_selected_shape(const AppState &as, bool dst) {
             pos = shape_index_to_src_pos(as, i); 
         }
 
-        const auto &s = as.shape[i];
+        const auto &s = *as.shape[i];
         float dx = std::abs(pos[0] - cx);
         float dy = std::abs(pos[1] - cy);
         float r = s.radius * s.line.scale;
@@ -405,11 +406,6 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
         SDL_DestroyRenderer(as.renderer);
         SDL_DestroyWindow(as.window);
 
-        for (auto &s: as.shape_set) {
-            free_gl_primitive(s.line);
-            free_gl_primitive(s.fill);
-        }
-
         glDeleteVertexArraysOES(1, &as.vao);
 
         SDL_CloseAudioDevice(as.audio_device);
@@ -459,17 +455,17 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     float cx=0, cy=0;
     SDL_GetMouseState(&cx, &cy);
 
-    draw_gl_primitive(as.shape_shader->program, as.bg);
+    as.bg.draw(as.shape_shader);
 
     for (int i=0; i < static_cast<int>(as.shape.size()); i++) {
-        auto &s = as.shape[i];
+        auto &s = *as.shape[i];
         int dst_idx = as.shape_dst[i];
 
         if (as.shape_done[i]) {
             s.set_trans(shape_index_to_dst_pos(as, dst_idx));
-            
-            draw_gl_primitive(as.shape_shader->program, s.fill);
-            draw_gl_primitive(as.shape_shader->program, s.line);
+           
+            s.fill.draw(as.shape_shader);
+            s.line.draw(as.shape_shader);
         } else {
             if (i == as.selected_shape) {
                 s.set_trans(glm::vec2{cx, cy});
@@ -486,16 +482,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
             s.set_theta(theta);
 
-            draw_gl_primitive(as.shape_shader->program, s.fill);
-            draw_gl_primitive(as.shape_shader->program, s.line);
+            s.fill.draw(as.shape_shader);
+            s.line.draw(as.shape_shader);
 
             // destination shape
             if (as.highlight_dst == dst_idx) {
                 s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
-                draw_gl_primitive(as.shape_shader->program, s.line_highlight);
+                s.line_highlight.draw(as.shape_shader);
             } else {
                 s.line.trans = shape_index_to_dst_pos(as, dst_idx);
-                draw_gl_primitive(as.shape_shader->program, s.line);
+                s.line.draw(as.shape_shader);
             }
         }
     }

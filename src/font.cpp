@@ -1,4 +1,5 @@
 #include <SDL3/SDL_surface.h>
+#include <memory>
 
 #include "font.hpp"
 #include "gl_helper.hpp"
@@ -106,8 +107,11 @@ void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2 * sizeof(float)));
+    int stride = sizeof(float) * 4;
+    int uv_offset = sizeof(float) * 2;
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(uv_offset));
 
     tex->use();
     letter->draw();
