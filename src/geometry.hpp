@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 #include <map>
 #include <string>
@@ -8,6 +9,8 @@
 #include <glm/vec4.hpp>
 #include <SDL3/SDL_opengles2.h>
 
+#include "gl_helper.hpp"
+
 struct VertexIndex {
     std::vector<glm::vec2> vertex;
     std::vector<uint32_t> index;
@@ -15,7 +18,6 @@ struct VertexIndex {
 
 // Wrapper for GL_TRIANGLES
 struct GLPrimitive {
-    GLuint tex = 0;
     GLuint vbo_vertex = 0;
     GLuint vbo_index = 0;
     int index_count = 0;
@@ -24,6 +26,8 @@ struct GLPrimitive {
     float scale = 1.0f;
     float theta = 0.0f; // rotation in radians
 };
+
+using GLPrimitivePtr = std::unique_ptr<GLPrimitive(), void(*)(GLPrimitive*)>;
 
 struct Shape {
     float radius;
@@ -37,6 +41,8 @@ struct Shape {
     void set_scale(float scale);
     void set_theta(float theta);
 };
+
+ShaderPtr make_shape_shader();
 
 // Low level functions to create polygon vertex and index.
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius);
@@ -52,3 +58,5 @@ Shape make_shape(int sides, const std::vector<float> &radius, float line_thickne
 // Create all shapes for the duration of the game.
 // All shapes are normalized to radius of 1.0 unit and scaled according to screen size.
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette);
+
+ShaderPtr make_geometry_shader();

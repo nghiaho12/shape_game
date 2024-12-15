@@ -2,7 +2,7 @@
 
 #include "font.hpp"
 #include "log.hpp"
-#include "shader.hpp"
+#include "gl_helper.hpp"
 
 namespace {
 const char *font_vertex_shader = R"(#version 300 es
@@ -45,24 +45,6 @@ void main() {
 }
 
 bool FontAtlas::load(const char *bmp_path) {
-    v_shader = glCreateShader(GL_VERTEX_SHADER);
-    f_shader = glCreateShader(GL_FRAGMENT_SHADER);
-
-    if (!compile_shader(v_shader, font_vertex_shader)) {
-        LOG("failed to compile font vertex shader");
-        return false;
-    }
-
-    if (!compile_shader(f_shader, font_fragment_shader)) {
-        LOG("failed to compile font fragment shader");
-        return false;
-    }
-
-    program = glCreateProgram();
-    glAttachShader(program, v_shader);
-    glAttachShader(program, f_shader);
-    glLinkProgram(program);
-
     SDL_Surface *bmp = SDL_LoadBMP(bmp_path);
     if (!bmp) {
         LOG("Failed to loat font atlas: %s", bmp_path);
@@ -71,6 +53,12 @@ bool FontAtlas::load(const char *bmp_path) {
 
     tex_w = bmp->w;
     tex_h = bmp->h;
+
+    shader = make_shader(font_vertex_shader, font_fragment_shader);
+
+    if (!shader) {
+        return false;
+    }
 
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -125,11 +113,11 @@ void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, 
         x, y + h, start.x, end.y,
     };
 
-    glUseProgram(program);
-    glUniform4fv(glGetUniformLocation(program, "bgColor"), 1, &bg[0]);
-    glUniform4fv(glGetUniformLocation(program, "fgColor"), 1, &fg[0]);
-    glUniform1i(glGetUniformLocation(program, "msdf"), 0); // set it manually
-    glUniform1f(glGetUniformLocation(program, "screenPxRange"), distance_range * scale); // set it manually
+    shader->use();
+    glUniform4fv(shader->get_loc("bgColor"), 1, &bg[0]);
+    glUniform4fv(shader->get_loc("fgColor"), 1, &fg[0]);
+    glUniform1i(shader->get_loc("msdf"), 0); // set it manually
+    glUniform1f(shader->get_loc("screenPxRange"), distance_range * scale); // set it manually
 
     glBindBuffer(GL_ARRAY_BUFFER, letter.vbo_vertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*vert.size(), vert.data());

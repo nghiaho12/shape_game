@@ -5,12 +5,15 @@
 #include <glm/vec4.hpp>
 #include <optional>
 #include <utility>
+#include "gl_helper.hpp"
 #include "geometry.hpp"
 
 struct FontAtlas {
-    GLuint program;
-    GLuint v_shader;
-    GLuint f_shader;
+    FontAtlas() : 
+        shader({}, {}) {
+    }
+
+    ShaderPtr shader;
 
     GLuint tex;
     int tex_w;

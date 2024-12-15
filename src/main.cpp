@@ -28,9 +28,8 @@
 #include "log.hpp"
 #include "geometry.hpp"
 #include "audio.hpp"
-#include "shader.hpp"
 #include "font.hpp"
-
+#include "gl_helper.hpp"
 
 constexpr int NUM_SHAPES = 5;
 constexpr float ASPECT_RATIO = 4.0/3.0;
@@ -69,6 +68,9 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 enum class AudioEnum {BGM, CORRECT, WIN};
 
 struct AppState {
+    AppState() : 
+        shape_shader({}, {}) {
+    }
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
     SDL_GLContext gl_ctx;
@@ -79,10 +81,6 @@ struct AppState {
     FontAtlas font;
     GLPrimitive letter;
 
-    bool shader_init = false;
-    GLuint v_shader = 0;
-    GLuint f_shader = 0;
-    GLuint program = 0;
     GLuint vao = 0;
 
     bool init = false;
@@ -97,6 +95,7 @@ struct AppState {
 
     GLPrimitive bg;
 
+    ShaderPtr shape_shader;
     std::vector<Shape> shape_set;
     std::array<Shape, NUM_SHAPES> shape;
     std::array<int, NUM_SHAPES> shape_dst;
@@ -227,21 +226,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     glEnable(GL_DEBUG_OUTPUT_KHR);
     glDebugMessageCallbackKHR(debug_callback, 0);
 
-    as->v_shader = glCreateShader(GL_VERTEX_SHADER);
-    as->f_shader = glCreateShader(GL_FRAGMENT_SHADER);
-
-    if (!compile_shader(as->v_shader, vertex_shader)) {
-        return SDL_APP_FAILURE;
-    }
-
-    if (!compile_shader(as->f_shader, fragment_shader)) {
-        return SDL_APP_FAILURE;
-    }
-
-    as->program = glCreateProgram();
-    glAttachShader(as->program, as->v_shader);
-    glAttachShader(as->program, as->f_shader);
-    glLinkProgram(as->program);
+    as->shape_shader = make_shape_shader();
 
     glGenVertexArraysOES(1, &as->vao);
     glBindVertexArrayOES(as->vao);
@@ -294,11 +279,11 @@ bool recalc_drawing_area(AppState &as) {
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
     
-    glUseProgram(as.program);
-    glUniformMatrix4fv(glGetUniformLocation(as.program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+    as.shape_shader->use();
+    glUniformMatrix4fv(as.shape_shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
 //
-    glUseProgram(as.font.program);
-    glUniformMatrix4fv(glGetUniformLocation(as.font.program, "projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+    as.font.shader->use();
+    glUniformMatrix4fv(as.font.shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
 
     return true;
 }
@@ -456,7 +441,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GL_MakeCurrent(as.window, as.gl_ctx);
 #endif
 
-    glUseProgram(as.program);
+    glUseProgram(as.shape_shader->program);
 
     if (!as.init) {
         recalc_drawing_area(as);
@@ -474,7 +459,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     float cx=0, cy=0;
     SDL_GetMouseState(&cx, &cy);
 
-    draw_gl_primitive(as.program, as.bg);
+    draw_gl_primitive(as.shape_shader->program, as.bg);
 
     for (int i=0; i < static_cast<int>(as.shape.size()); i++) {
         auto &s = as.shape[i];
@@ -483,8 +468,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         if (as.shape_done[i]) {
             s.set_trans(shape_index_to_dst_pos(as, dst_idx));
             
-            draw_gl_primitive(as.program, s.fill);
-            draw_gl_primitive(as.program, s.line);
+            draw_gl_primitive(as.shape_shader->program, s.fill);
+            draw_gl_primitive(as.shape_shader->program, s.line);
         } else {
             if (i == as.selected_shape) {
                 s.set_trans(glm::vec2{cx, cy});
@@ -501,16 +486,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
             s.set_theta(theta);
 
-            draw_gl_primitive(as.program, s.fill);
-            draw_gl_primitive(as.program, s.line);
+            draw_gl_primitive(as.shape_shader->program, s.fill);
+            draw_gl_primitive(as.shape_shader->program, s.line);
 
             // destination shape
             if (as.highlight_dst == dst_idx) {
                 s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
-                draw_gl_primitive(as.program, s.line_highlight);
+                draw_gl_primitive(as.shape_shader->program, s.line_highlight);
             } else {
                 s.line.trans = shape_index_to_dst_pos(as, dst_idx);
-                draw_gl_primitive(as.program, s.line);
+                draw_gl_primitive(as.shape_shader->program, s.line);
             }
         }
     }

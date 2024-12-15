@@ -21,8 +21,8 @@ add_executable(${EXECUTABLE_NAME}
     src/audio.hpp
     src/font.cpp
     src/font.hpp
-    src/shader.cpp
-    src/shader.hpp
+    src/gl_helper.cpp
+    src/gl_helper.hpp
     src/log.hpp
 )
 
