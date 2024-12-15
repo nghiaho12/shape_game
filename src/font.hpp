@@ -3,23 +3,19 @@
 #include <SDL3/SDL_opengles2.h>
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
-#include <optional>
 #include <utility>
 #include "gl_helper.hpp"
-#include "geometry.hpp"
 
 struct FontAtlas {
     FontAtlas() : 
-        shader({}, {}) {
+        shader({}, {}),
+        tex({}, {}),
+        letter({}, {}) {
     }
 
     ShaderPtr shader;
-
-    GLuint tex;
-    int tex_w;
-    int tex_h;
-
-    GLPrimitive letter;
+    TexturePtr tex;
+    VertexBufferPtr letter;
 
     // hardcoded values from running:
     // wine msdf-atlas-gen.exe -font /usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf -type msdf -fontname ubuntu_mono -uniformcols 10 -imageout atlas.bmp
