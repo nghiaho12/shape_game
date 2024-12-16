@@ -45,6 +45,7 @@ struct VertexBuffer {
 using VertexBufferPtr = std::unique_ptr<VertexBuffer, void(*)(VertexBuffer*)>;
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const std::vector<uint32_t> &index);
 VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index);
+VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index);
 
 // Misc
 void enable_gl_debug_callback();

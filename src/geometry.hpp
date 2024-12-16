@@ -13,11 +13,7 @@
 
 // Wrapper for GL_TRIANGLES
 struct GLPrimitive {
-    GLPrimitive() : 
-        vertex_buffer({}, {}) {
-    }
-
-    VertexBufferPtr vertex_buffer;
+    VertexBufferPtr vertex_buffer{{}, {}};
 
     glm::vec4 color{};
     glm::vec2 trans{};

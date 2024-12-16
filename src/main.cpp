@@ -68,10 +68,6 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 enum class AudioEnum {BGM, CORRECT, WIN};
 
 struct AppState {
-    AppState() : 
-        shape_shader({}, {}) {
-    }
-
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
     SDL_GLContext gl_ctx;
@@ -96,7 +92,7 @@ struct AppState {
 
     GLPrimitive bg;
 
-    ShaderPtr shape_shader;
+    ShaderPtr shape_shader{{}, {}};
     std::vector<Shape> shape_set;
     std::array<Shape*, NUM_SHAPES> shape;
     std::array<int, NUM_SHAPES> shape_dst;
@@ -493,7 +489,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    as.font.draw_string(0, 0, 32.0, glm::vec4(1.f, 1.f, 1.f, 1.f), glm::vec4(0.f), "111"); 
+    float font_scale = as.w*0.01;
+    as.font.draw_string(as.xoff, as.yoff, font_scale, tableau10_palette()["yellow"], glm::vec4(0.f), glm::vec4(0,0,0,1), "1"); 
 
     SDL_GL_SwapWindow(as.window);
 

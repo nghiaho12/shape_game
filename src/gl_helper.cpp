@@ -126,28 +126,14 @@ void Texture::use() {
 }
 
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const std::vector<uint32_t> &index) {
-    auto cleanup = [](VertexBuffer *v) {
-        LOG("deleting vertex and index buffer: %d %d", v->vertex, v->index);
-        glDeleteBuffers(1, &v->vertex);
-        glDeleteBuffers(1, &v->index);
-    };
-
-    VertexBufferPtr v(new VertexBuffer, cleanup);
-
-    glGenBuffers(1, &v->vertex);
-    glBindBuffer(GL_ARRAY_BUFFER, v->vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*vertex.size(), vertex.data(), GL_DYNAMIC_DRAW);
-
-    glGenBuffers(1, &v->index);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v->index);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*index.size(), index.data(), GL_STATIC_DRAW);
-
-    v->index_count = index.size();
-
-    return v;
+    return make_vertex_buffer(&vertex[0].x, 2*vertex.size(), index);
 }
 
 VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index) {
+    return make_vertex_buffer(vertex.data(), vertex.size(), index);
+}
+
+VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index) {
     auto cleanup = [](VertexBuffer *v) {
         LOG("deleting vertex and index buffer: %d %d", v->vertex, v->index);
         glDeleteBuffers(1, &v->vertex);
@@ -158,7 +144,7 @@ VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::
 
     glGenBuffers(1, &v->vertex);
     glBindBuffer(GL_ARRAY_BUFFER, v->vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*vertex.size(), vertex.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*vertex_count, vertex, GL_DYNAMIC_DRAW);
 
     glGenBuffers(1, &v->index);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v->index);
