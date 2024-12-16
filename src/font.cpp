@@ -41,9 +41,15 @@ void main() {
     float dist_px = screenPxRange*(sd - 0.5) + 0.5;
 
     float outline_threshold = screenPxRange*0.1f;
+    vec4 outline_color = vec4(1,0,0,1);
 
-    if (dist_px > -outline_threshold && dist_px < 1.0f) {
-        color = vec4(1,0,0,1);
+    if (dist_px > 0.0 && dist_px < 1.0) { // inner and start of outline
+        color = mix(outline_color, fgColor, dist_px);
+    } else if (dist_px > -outline_threshold && dist_px < -outline_threshold + 1.0) {
+        float opacity = clamp((dist_px + outline_threshold), 0.0, 1.0);
+        color = mix(bgColor, outline_color, opacity);
+    } else if (dist_px > -outline_threshold && dist_px < 1.0f) {
+        color = outline_color;
     } else {
         float opacity = clamp(dist_px, 0.0, 1.0);
         color = mix(bgColor, fgColor, opacity);
