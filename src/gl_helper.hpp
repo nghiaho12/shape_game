@@ -13,8 +13,8 @@ struct Shader {
     GLuint vertex = 0;
     GLuint fragment = 0;
 
-    void use(); // glUseProgram
-    GLint get_loc(const char *name); // glGetUniformLocation
+    void use() const; // glUseProgram
+    GLint get_loc(const char *name) const; // glGetUniformLocation
 };
 
 using ShaderPtr = std::unique_ptr<Shader, void(*)(Shader*)>;
@@ -25,7 +25,7 @@ struct Texture {
     int width = 0;
     int height = 0;
 
-    void use();
+    void use() const;
 };
 
 using TexturePtr = std::unique_ptr<Texture, void(*)(Texture*)>;
@@ -36,10 +36,10 @@ struct VertexBuffer {
     GLuint index = 0;
     int index_count = 0;
 
-    void bind();
-    void draw();
-    void update_vertex(const std::vector<glm::vec2> &v);
-    void update_vertex(const std::vector<float> &v);
+    void bind() const;
+    void draw() const;
+    void update_vertex(const std::vector<glm::vec2> &v) const;
+    void update_vertex(const std::vector<float> &v) const;
 };
 
 using VertexBufferPtr = std::unique_ptr<VertexBuffer, void(*)(VertexBuffer*)>;

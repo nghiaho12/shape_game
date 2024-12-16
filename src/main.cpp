@@ -1,3 +1,4 @@
+#include <SDL3/SDL_init.h>
 #define SDL_MAIN_USE_CALLBACKS // use the callbacks instead of main() 
 #define GL_GLEXT_PROTOTYPES
 
@@ -36,6 +37,12 @@ constexpr float ASPECT_RATIO = 4.0/3.0;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
 constexpr float SHAPE_ROTATION_SPEED = M_PI_2;
+
+const glm::vec4 TEXT_FG{231/255.0, 202/255.0, 96/255.0, 1.0};
+const glm::vec4 TEXT_BG{0, 0, 0, 0};
+const glm::vec4 TEXT_OUTLINE{0, 0, 0, 1};
+constexpr float TEXT_OUTLINE_FACTOR = 0.1;
+constexpr float TEXT_PER_OF_WIDTH = 0.001; // text scale as percentage of drawing area width
 
 std::map<std::string, glm::vec4> tableau10_palette() {
     const std::map<std::string, uint32_t> color{
@@ -103,12 +110,14 @@ struct AppState {
     uint64_t last_tick = 0;
 };
 
-void update_gl_primitives(AppState &as) {
+void update_scale(AppState &as) {
     float scale = as.xdiv * 0.4f;
 
     for (auto &s: as.shape) {
         s->set_scale(scale);
     }
+
+    as.font.set_scale(as.w * TEXT_PER_OF_WIDTH);
 }
 
 void init_game(AppState &as) {
@@ -140,7 +149,7 @@ void init_game(AppState &as) {
     as.selected_shape = -1;
     as.highlight_dst = -1;
 
-    update_gl_primitives(as);
+    update_scale(as);
 }
 
 bool init_audio(AppState &as, const std::string &base_path) {
@@ -167,6 +176,19 @@ bool init_audio(AppState &as, const std::string &base_path) {
     } else {
         return false;
     }
+
+    return true;
+}
+
+bool init_font(AppState &as, const std::string &base_path) {
+    if (!as.font.load(base_path + "atlas.bmp", base_path + "atlas.txt")) {
+        return false;
+    }
+
+    as.font.set_fg(TEXT_FG);
+    as.font.set_bg(TEXT_BG);
+    as.font.set_outline(TEXT_OUTLINE);
+    as.font.set_outline_factor(TEXT_OUTLINE_FACTOR);
 
     return true;
 }
@@ -217,13 +239,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     enable_gl_debug_callback();
 
+    if (!init_font(*as, base_path)) {
+        return SDL_APP_FAILURE;
+    }
+
+    as->shape_shader = make_shape_shader();
+        
     glEnable(GL_BLEND);  
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    as->shape_shader = make_shape_shader();
-
     glGenVertexArraysOES(1, &as->vao);
     glBindVertexArrayOES(as->vao);
+
 
     // background color for drawing area
     // the area size is determined later
@@ -234,10 +261,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
     init_game(*as);
-
-    if (!as->font.load(base_path + "atlas.bmp", base_path + "atlas.txt")) {
-        return SDL_APP_FAILURE;
-    }
 
     as->last_tick = SDL_GetTicks();
 
@@ -273,10 +296,10 @@ bool recalc_drawing_area(AppState &as) {
 
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
-    
+   
     as.shape_shader->use();
     glUniformMatrix4fv(as.shape_shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
-//
+
     as.font.shader->use();
     glUniformMatrix4fv(as.font.shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
 
@@ -351,7 +374,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
         case SDL_EVENT_WINDOW_RESIZED:
             recalc_drawing_area(as);
             update_background(as);
-            update_gl_primitives(as);
+            update_scale(as);
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -435,7 +458,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (!as.init) {
         recalc_drawing_area(as);
         update_background(as);
-        update_gl_primitives(as);
+        update_scale(as);
         as.init = true;
     }
 
@@ -489,8 +512,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    float font_scale = as.w*0.01;
-    as.font.draw_string(as.xoff, as.yoff, font_scale, tableau10_palette()["yellow"], glm::vec4(0.f), glm::vec4(0,0,0,1), "1234"); 
+    as.font.draw_string(as.xoff, as.yoff, "1234"); 
 
     SDL_GL_SwapWindow(as.window);
 

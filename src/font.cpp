@@ -14,8 +14,6 @@ layout(location = 0) in vec2 position;
 layout(location = 1) in vec2 atlas_tex_coord;
 
 uniform mat4 projection_matrix;
-// uniform vec2 trans;
-
 out vec2 texCoord;
 
 void main() {
@@ -32,20 +30,20 @@ uniform sampler2D msdf;
 uniform vec4 bg_color;
 uniform vec4 fg_color;
 uniform vec4 outline_color;
+uniform float outline_factor;
 uniform float screen_px_range;
+uniform float scale;
 
 float median(float r, float g, float b) {
     return max(min(r, g), min(max(r, g), b));
 }
 
 void main() {
-    const float outline_factor = 0.1;
-
     vec3 msd = texture(msdf, texCoord).rgb;
     float sd = median(msd.r, msd.g, msd.b);
     float dist_px = screen_px_range*(sd - 0.5) + 0.5;
 
-    float outline_dist = screen_px_range*outline_factor;
+    float outline_dist = screen_px_range*outline_factor*scale;
 
     if (dist_px > 0.0 && dist_px < 1.0) { 
         // inner and start of outline
@@ -108,6 +106,10 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
         in >> advance[i];
     }
 
+    shader->use();
+    glUniform1i(shader->get_loc("msdf"), 0); 
+    glUniform1f(shader->get_loc("screen_px_range"), distance_range); 
+
     return true;
 }
 
@@ -127,7 +129,7 @@ std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
     return {start, end};
 }
 
-void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const glm::vec4 &outline, char ch) {
+void FontAtlas::draw_letter(float x, float y, char ch) {
     auto [start, end] = get_char_uv(ch);
 
     float w = grid_width * scale;
@@ -142,11 +144,6 @@ void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, 
     };
 
     shader->use();
-    glUniform4fv(shader->get_loc("bg_color"), 1, &bg[0]);
-    glUniform4fv(shader->get_loc("fg_color"), 1, &fg[0]);
-    glUniform4fv(shader->get_loc("outline_color"), 1, &outline[0]);
-    glUniform1i(shader->get_loc("msdf"), 0); 
-    glUniform1f(shader->get_loc("screen_px_range"), distance_range * scale); 
 
     letter->update_vertex(vert);
     letter->bind();
@@ -164,11 +161,37 @@ void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, 
     letter->draw();
 }
 
-void FontAtlas::draw_string(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const glm::vec4 &outline, const std::string &str) {
+void FontAtlas::draw_string(float x, float y, const std::string &str) {
     float xpos = x;
 
     for (char ch: str) {
-        draw_letter(xpos, y, scale, fg, bg, outline, ch);
+        draw_letter(xpos, y, ch);
         xpos += advance[static_cast<int>(ch)]*em_size*scale;
     }
+}
+
+void FontAtlas::set_scale(float scale) {
+    shader->use();
+    glUniform1f(shader->get_loc("scale"), scale);
+    this->scale = scale;
+}
+
+void FontAtlas::set_fg(const glm::vec4 &color) const {
+    shader->use();
+    glUniform4fv(shader->get_loc("fg_color"), 1, &color[0]);
+}
+
+void FontAtlas::set_bg(const glm::vec4 &color) const {
+    shader->use();
+    glUniform4fv(shader->get_loc("bg_color"), 1, &color[0]);
+}
+
+void FontAtlas::set_outline(const glm::vec4 &color) const {
+    shader->use();
+    glUniform4fv(shader->get_loc("outline_color"), 1, &color[0]);
+}
+
+void FontAtlas::set_outline_factor(float factor) const {
+    shader->use();
+    glUniform1f(shader->get_loc("outline_factor"), factor);
 }

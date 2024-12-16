@@ -51,12 +51,14 @@ void enable_gl_debug_callback() {
     glDebugMessageCallbackKHR(debug_callback, 0);
 }
 
-void Shader::use() {
+void Shader::use() const {
     glUseProgram(program);
 }
 
-GLint Shader::get_loc(const char *name) {
-    return glGetUniformLocation(program, name);
+GLint Shader::get_loc(const char *name) const {
+    GLint ret = glGetUniformLocation(program, name);
+    assert(ret >= 0);
+    return ret;
 }
 
 ShaderPtr make_shader(const char *vertex_code, const char *fragment_code) {
@@ -120,7 +122,7 @@ TexturePtr make_texture(const std::string &bmp_path) {
     return t;
 }
 
-void Texture::use() {
+void Texture::use() const {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, id);
 }
@@ -155,21 +157,21 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const 
     return v;
 }
 
-void VertexBuffer::bind() {
+void VertexBuffer::bind() const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
 }
 
-void VertexBuffer::draw() {
+void VertexBuffer::draw() const {
     glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
 }
 
-void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) {
+void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*v.size(), v.data());
 }
 
-void VertexBuffer::update_vertex(const std::vector<float> &v) {
+void VertexBuffer::update_vertex(const std::vector<float> &v) const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*v.size(), v.data());
 }
