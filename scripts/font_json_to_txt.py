@@ -23,18 +23,22 @@ with open(sys.argv[1], "r") as fp:
 a = data["atlas"]
 print(f"distance_range {a['distanceRange']}")
 print(f"em_size {a['size']}")
-print(f"grid_width {a['grid']['cellWidth']}")
-print(f"grid_height {a['grid']['cellHeight']}")
-print(f"grid_cols {a['grid']['columns']}")
-print(f"grid_rows {a['grid']['rows']}")
-
-advance = [0]*256
+print("unicode")
 
 for a in data["glyphs"]:
-    ch = a["unicode"]
-    advance[ch] = a["advance"]
+    print(a["unicode"], end=" ")
+    print(a["advance"], end=" ")
 
-print("advance ", end="")
+    if "planeBounds" not in a:
+        print("0 0 0 0 0 0 0 0")
+        continue
 
-for a in advance:
-    print(f"{a} ", end="")
+    print(a["planeBounds"]["left"], end=" ")
+    print(a["planeBounds"]["bottom"], end=" ")
+    print(a["planeBounds"]["right"], end=" ")
+    print(a["planeBounds"]["top"], end=" ")
+    print(a["atlasBounds"]["left"], end=" ")
+    print(a["atlasBounds"]["bottom"], end=" ")
+    print(a["atlasBounds"]["right"], end=" ")
+    print(a["atlasBounds"]["top"], end=" ")
+    print("")

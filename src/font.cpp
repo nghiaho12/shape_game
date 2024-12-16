@@ -31,7 +31,7 @@ uniform vec4 bg_color;
 uniform vec4 fg_color;
 uniform vec4 outline_color;
 uniform float outline_factor;
-uniform float screen_px_range;
+uniform float distance_range;
 uniform float scale;
 
 float median(float r, float g, float b) {
@@ -41,9 +41,10 @@ float median(float r, float g, float b) {
 void main() {
     vec3 msd = texture(msdf, texCoord).rgb;
     float sd = median(msd.r, msd.g, msd.b);
-    float dist_px = screen_px_range*(sd - 0.5) + 0.5;
 
-    float outline_dist = screen_px_range*outline_factor*scale;
+    float screen_px_range = distance_range * scale;
+    float dist_px = screen_px_range*(sd - 0.5) + 0.5;
+    float outline_dist = screen_px_range*outline_factor;
 
     if (dist_px > 0.0 && dist_px < 1.0) { 
         // inner and start of outline
@@ -58,6 +59,8 @@ void main() {
         float opacity = clamp(dist_px, 0.0, 1.0);
         color = mix(bg_color, fg_color, opacity);
     }
+
+    // color = vec4(0.5, 0.5, 0.5, 0.5);
 })";
 }
 
@@ -92,39 +95,42 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
     in >> distance_range;
     in >> label; assert(label == "em_size");
     in >> em_size;
-    in >> label; assert(label == "grid_width");
-    in >> grid_width;
-    in >> label; assert(label == "grid_height");
-    in >> grid_height;
-    in >> label; assert(label == "grid_cols");
-    in >> grid_cols;
-    in >> label; assert(label == "grid_rows");
-    in >> grid_rows;
-    in >> label; assert(label == "advance");
+    in >> label; assert(label == "unicode");
 
-    for (int i=0; i < 256; i++) {
-        in >> advance[i];
+    while (true) {
+        int unicode;
+        in >> unicode;
+
+        if (in.eof()) {
+            break;
+        }
+
+        Glyph g;
+        in >> g.advance;
+        in >> g.plane_left;
+        in >> g.plane_bottom;
+        in >> g.plane_right;
+        in >> g.plane_top;
+        in >> g.atlas_left;
+        in >> g.atlas_bottom;
+        in >> g.atlas_right;
+        in >> g.atlas_top;
+
+        glyph[unicode] = g;
     }
 
     shader->use();
     glUniform1i(shader->get_loc("msdf"), 0); 
-    glUniform1f(shader->get_loc("screen_px_range"), distance_range); 
+    glUniform1f(shader->get_loc("distance_range"), static_cast<float>(distance_range)); 
 
     return true;
 }
 
 std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
-    // Assume character set from ascii 33 to 126
-    int idx = ch - 33;
+    const Glyph &g = glyph[static_cast<int>(ch)];
 
-    int row = idx / grid_cols;
-    int col = idx % grid_cols;
-
-    float u = 1.f*col / grid_cols;
-    float v = 1.f*row / grid_rows;
-
-    glm::vec2 start{u, v};
-    glm::vec2 end = start + glm::vec2{1.f*(grid_width-1)/tex->width, 1.f*(grid_height-1)/tex->height};
+    glm::vec2 start{g.atlas_left/tex->width, 1- g.atlas_bottom/tex->height};
+    glm::vec2 end{g.atlas_right/tex->width, 1- g.atlas_top/tex->height};
 
     return {start, end};
 }
@@ -132,15 +138,22 @@ std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
 void FontAtlas::draw_letter(float x, float y, char ch) {
     auto [start, end] = get_char_uv(ch);
 
-    float w = grid_width * scale;
-    float h = grid_height * scale;
+    const Glyph &g = glyph[static_cast<int>(ch)];
+
+    float w = (g.atlas_right - g.atlas_left)* scale;
+    float h = (g.atlas_top - g.atlas_bottom)* scale;
+    float xoff = g.plane_left * em_size * scale;
+    float yoff = std::abs(g.plane_bottom) * em_size * scale;
+
+    x += xoff;
+    y += yoff;
 
     // pos + uv
     std::vector<float> vert{
         x, y, start.x, start.y,
         x + w, y,  end.x, start.y,
-        x + w, y + h,  end.x, end.y,
-        x, y + h, start.x, end.y,
+        x + w, y - h,  end.x, end.y,
+        x, y - h, start.x, end.y,
     };
 
     shader->use();
@@ -166,7 +179,8 @@ void FontAtlas::draw_string(float x, float y, const std::string &str) {
 
     for (char ch: str) {
         draw_letter(xpos, y, ch);
-        xpos += advance[static_cast<int>(ch)]*em_size*scale;
+        const Glyph &g = glyph[static_cast<int>(ch)];
+        xpos += g.advance*em_size*scale;
     }
 }
 

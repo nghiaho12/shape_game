@@ -42,7 +42,7 @@ const glm::vec4 TEXT_FG{231/255.0, 202/255.0, 96/255.0, 1.0};
 const glm::vec4 TEXT_BG{0, 0, 0, 0};
 const glm::vec4 TEXT_OUTLINE{0, 0, 0, 1};
 constexpr float TEXT_OUTLINE_FACTOR = 0.1;
-constexpr float TEXT_PER_OF_WIDTH = 0.001; // text scale as percentage of drawing area width
+constexpr float TEXT_PER_OF_WIDTH = 0.005; // text scale as percentage of drawing area width
 
 std::map<std::string, glm::vec4> tableau10_palette() {
     const std::map<std::string, uint32_t> color{
@@ -512,7 +512,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    as.font.draw_string(as.xoff, as.yoff, "1234"); 
+    as.font.draw_string(as.xoff, as.h/2, "Nghia Ho"); 
 
     SDL_GL_SwapWindow(as.window);
 

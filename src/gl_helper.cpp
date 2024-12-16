@@ -57,7 +57,7 @@ void Shader::use() const {
 
 GLint Shader::get_loc(const char *name) const {
     GLint ret = glGetUniformLocation(program, name);
-    assert(ret >= 0);
+    // assert(ret >= 0);
     return ret;
 }
 

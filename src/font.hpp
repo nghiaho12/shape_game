@@ -6,6 +6,18 @@
 #include <utility>
 #include "gl_helper.hpp"
 
+struct Glyph {
+    float advance; // em
+    float plane_left; // em
+    float plane_bottom;
+    float plane_right;
+    float plane_top;
+    float atlas_left; // pixel 
+    float atlas_bottom;
+    float atlas_right;
+    float atlas_top;
+};
+
 struct FontAtlas {
     ShaderPtr shader{{},{}};
     TexturePtr tex{{}, {}};
@@ -13,11 +25,7 @@ struct FontAtlas {
 
     int distance_range; // signed distance field range in pixels
     float em_size; // pixels per em unit
-    int grid_width; // pixels
-    int grid_height; // pixels
-    int grid_cols;
-    int grid_rows;
-    float advance[256]; // font x advance in em units
+    Glyph glyph[256] = {}; 
     float scale;
 
     bool load(const std::string &atlas_path, const std::string &atlas_txt);
