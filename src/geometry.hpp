@@ -28,7 +28,7 @@ struct GLPrimitive {
 };
 
 struct Shape {
-    float radius;
+    float radius = 1.0f;
     int rotation_direction = 1;
 
     GLPrimitive line;
@@ -51,3 +51,9 @@ ShaderPtr make_shape_shader();
 // All shapes are normalized to radius of 1.0 unit and scaled according to screen size.
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette);
 
+std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius);
+VertexIndex make_fill(const std::vector<glm::vec2> &vert);
+VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness);
+Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
+Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
+Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);

@@ -21,10 +21,9 @@ struct FontAtlas {
     // wine msdf-atlas-gen.exe -font /usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf -type msdf -fontname ubuntu_mono -uniformcols 10 -imageout atlas.bmp
     static const int cols = 10;
     static const int rows = 10;
-    static const int grid_w = 21;
-    static const int grid_h = 35;
-    static constexpr float distance_range = 2.0f;
-    static constexpr float glyph_size = 32.875f;
+    static const int grid_w = 37;
+    static const int grid_h = 41;
+    static constexpr float distance_range = 8.0f;
 
     bool load(const char *bmp_path);
     std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);

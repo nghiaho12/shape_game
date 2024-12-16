@@ -61,7 +61,7 @@ GLint Shader::get_loc(const char *name) {
 
 ShaderPtr make_shader(const char *vertex_code, const char *fragment_code) {
     auto cleanup = [](Shader *s) {
-        LOG("cleaning up shader");
+        LOG("deleting shader");
         glDeleteShader(s->vertex);
         glDeleteShader(s->fragment);
         glDeleteProgram(s->program);
@@ -98,7 +98,7 @@ TexturePtr make_texture(const char *bmp_path) {
     }
 
     auto cleanup = [](Texture *t) {
-        LOG("cleaning up texture");
+        LOG("deleting texture");
         glDeleteTextures(1, &t->id);
     };
                    
@@ -112,6 +112,8 @@ TexturePtr make_texture(const char *bmp_path) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp->w, bmp->h, 0, GL_RGB, GL_UNSIGNED_BYTE, bmp->pixels);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     SDL_DestroySurface(bmp);
 
@@ -125,7 +127,7 @@ void Texture::use() {
 
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const std::vector<uint32_t> &index) {
     auto cleanup = [](VertexBuffer *v) {
-        LOG("cleaning up vertex buffer");
+        LOG("deleting vertex and index buffer: %d %d", v->vertex, v->index);
         glDeleteBuffers(1, &v->vertex);
         glDeleteBuffers(1, &v->index);
     };
@@ -147,7 +149,7 @@ VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const s
 
 VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index) {
     auto cleanup = [](VertexBuffer *v) {
-        LOG("cleaning up vertex buffer");
+        LOG("deleting vertex and index buffer: %d %d", v->vertex, v->index);
         glDeleteBuffers(1, &v->vertex);
         glDeleteBuffers(1, &v->index);
     };
@@ -166,7 +168,6 @@ VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::
 
     return v;
 }
-
 
 void VertexBuffer::bind() {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);

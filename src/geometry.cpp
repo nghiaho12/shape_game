@@ -35,6 +35,8 @@ void main() {
     o_color = v_color;
 })";
 
+} // namespace 
+  // :
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius) {
     std::vector<glm::vec2> vert;
 
@@ -200,7 +202,6 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     return make_shape(vert, line_thickness, line_color, fill_color);
 }
 
-} // namespace 
   
 void GLPrimitive::draw(const ShaderPtr &shader) {
     shader->use();

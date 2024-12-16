@@ -147,6 +147,34 @@ void init_game(AppState &as) {
     update_gl_primitives(as);
 }
 
+bool init_audio(AppState &as, const std::string &base_path) {
+    as.audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+    if (as.audio_device == 0) {
+        LOG("Couldn't open audio device: %s", SDL_GetError());
+        return false;
+    }
+
+    if (auto w = load_ogg(as.audio_device, (base_path + "bgm.ogg").c_str(), 0.1)) {
+        as.audio[AudioEnum::BGM] = *w;
+    } else {
+        return false;
+    }
+
+    if (auto w = load_ogg(as.audio_device, (base_path + "win.ogg").c_str())) {
+        as.audio[AudioEnum::WIN] = *w;
+    } else {
+        return false;
+    }
+
+    if (auto w = load_wav(as.audio_device, (base_path + "ding.wav").c_str())) {
+        as.audio[AudioEnum::CORRECT] = *w;
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         LOG("SDL_Init failed: %s", SDL_GetError());
@@ -167,28 +195,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     base_path = "";
 #endif
 
-    as->audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
-    if (as->audio_device == 0) {
-        LOG("Couldn't open audio device: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
-    }
-
-    if (auto w = load_ogg(as->audio_device, (base_path + "bgm.ogg").c_str(), 0.1)) {
-        as->audio[AudioEnum::BGM] = *w;
-        
-    } else {
-        return SDL_APP_FAILURE;
-    }
-
-    if (auto w = load_ogg(as->audio_device, (base_path + "win.ogg").c_str())) {
-        as->audio[AudioEnum::WIN] = *w;
-    } else {
-        return SDL_APP_FAILURE;
-    }
-
-    if (auto w = load_wav(as->audio_device, (base_path + "ding.wav").c_str())) {
-        as->audio[AudioEnum::CORRECT] = *w;
-    } else {
+    if (!init_audio(*as, base_path)) {
         return SDL_APP_FAILURE;
     }
 
@@ -214,6 +221,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     enable_gl_debug_callback();
 
+    glEnable(GL_BLEND);  
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     as->shape_shader = make_shape_shader();
 
     glGenVertexArraysOES(1, &as->vao);
@@ -229,11 +239,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
     init_game(*as);
 
-    as->last_tick = SDL_GetTicks();
-
     if (!as->font.load("/home/nghia/Downloads/msdf-atlas-gen/atlas.bmp")) {
         return SDL_APP_FAILURE;
     }
+
+    as->last_tick = SDL_GetTicks();
 
     return SDL_APP_CONTINUE;
 }
@@ -433,7 +443,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         as.init = true;
     }
 
-    glDisable(GL_DEPTH_TEST);
+    // glDisable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -483,7 +493,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    as.font.draw_string(0, 0, 4.0, glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(1.f), "Nghia"); 
+    as.font.draw_string(0, 0, 32.0, glm::vec4(1.f, 1.f, 1.f, 1.f), glm::vec4(0.f), "111"); 
 
     SDL_GL_SwapWindow(as.window);
 

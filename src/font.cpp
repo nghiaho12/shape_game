@@ -38,9 +38,16 @@ float median(float r, float g, float b) {
 void main() {
     vec3 msd = texture(msdf, texCoord).rgb;
     float sd = median(msd.r, msd.g, msd.b);
-    float screenPxDistance = screenPxRange*(sd - 0.5);
-    float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
-    color = mix(bgColor, fgColor, opacity);
+    float dist_px = screenPxRange*(sd - 0.5) + 0.5;
+
+    float outline_threshold = screenPxRange*0.1f;
+
+    if (dist_px > -outline_threshold && dist_px < 1.0f) {
+        color = vec4(1,0,0,1);
+    } else {
+        float opacity = clamp(dist_px, 0.0, 1.0);
+        color = mix(bgColor, fgColor, opacity);
+    }
 })";
 }
 
