@@ -11,17 +11,17 @@ struct FontAtlas {
     TexturePtr tex{{}, {}};
     VertexBufferPtr letter{{}, {}};
 
-    // hardcoded values from running:
-    // wine msdf-atlas-gen.exe -font /usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf -type msdf -fontname ubuntu_mono -uniformcols 10 -imageout atlas.bmp
-    static const int cols = 10;
-    static const int rows = 10;
-    static const int grid_w = 37;
-    static const int grid_h = 41;
-    static constexpr float distance_range = 8.0f;
+    int distance_range;
+    float em_size;
+    int grid_width;
+    int grid_height;
+    int grid_cols;
+    int grid_rows;
+    float advance[256];
 
-    bool load(const char *bmp_path);
+    bool load(const std::string &atlas_path, const std::string &atlas_txt);
+
     std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);
-
     void draw_letter(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const glm::vec4 &outline, char ch);
     void draw_string(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const glm::vec4 &outline, const std::string &str);
 };

@@ -235,7 +235,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
     init_game(*as);
 
-    if (!as->font.load("/home/nghia/Downloads/msdf-atlas-gen/atlas.bmp")) {
+    if (!as->font.load(base_path + "atlas.bmp", base_path + "atlas.txt")) {
         return SDL_APP_FAILURE;
     }
 
@@ -490,7 +490,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     float font_scale = as.w*0.01;
-    as.font.draw_string(as.xoff, as.yoff, font_scale, tableau10_palette()["yellow"], glm::vec4(0.f), glm::vec4(0,0,0,1), "1"); 
+    as.font.draw_string(as.xoff, as.yoff, font_scale, tableau10_palette()["yellow"], glm::vec4(0.f), glm::vec4(0,0,0,1), "1234"); 
 
     SDL_GL_SwapWindow(as.window);
 

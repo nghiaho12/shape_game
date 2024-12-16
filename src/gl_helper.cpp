@@ -90,10 +90,10 @@ ShaderPtr make_shader(const char *vertex_code, const char *fragment_code) {
     return s;
 }
 
-TexturePtr make_texture(const char *bmp_path) {
-    SDL_Surface *bmp = SDL_LoadBMP(bmp_path);
+TexturePtr make_texture(const std::string &bmp_path) {
+    SDL_Surface *bmp = SDL_LoadBMP(bmp_path.c_str());
     if (!bmp) {
-        LOG("Failed to loat font atlas: %s", bmp_path);
+        LOG("Failed to loat font atlas: %s", bmp_path.c_str());
         return {{}, {}};
     }
 

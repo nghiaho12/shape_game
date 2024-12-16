@@ -1,8 +1,10 @@
 #include <SDL3/SDL_surface.h>
 #include <memory>
+#include <fstream>
 
 #include "font.hpp"
 #include "gl_helper.hpp"
+#include "log.hpp"
 
 namespace {
 const char *font_vertex_shader = R"(#version 300 es
@@ -61,23 +63,50 @@ void main() {
 })";
 }
 
-bool FontAtlas::load(const char *bmp_path) {
+bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt) {
     shader = make_shader(font_vertex_shader, font_fragment_shader);
 
     if (!shader) {
         return false;
     }
 
-    tex = make_texture(bmp_path);
+    tex = make_texture(atlas_path);
 
     if (!tex) {
         return false;
     }
 
-    // quad
+    // quad for letter
     std::vector<float> empty_vert(16);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     letter = make_vertex_buffer(empty_vert, index);
+
+    std::ifstream in(atlas_txt);
+    
+    if (!in) {
+        LOG("failed to open: %s", atlas_txt.c_str());
+        return false;
+    }
+
+    std::string label;
+
+    in >> label; assert(label == "distance_range");
+    in >> distance_range;
+    in >> label; assert(label == "em_size");
+    in >> em_size;
+    in >> label; assert(label == "grid_width");
+    in >> grid_width;
+    in >> label; assert(label == "grid_height");
+    in >> grid_height;
+    in >> label; assert(label == "grid_cols");
+    in >> grid_cols;
+    in >> label; assert(label == "grid_rows");
+    in >> grid_rows;
+    in >> label; assert(label == "advance");
+
+    for (int i=0; i < 256; i++) {
+        in >> advance[i];
+    }
 
     return true;
 }
@@ -86,14 +115,14 @@ std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
     // Assume character set from ascii 33 to 126
     int idx = ch - 33;
 
-    int row = idx / cols;
-    int col = idx % cols;
+    int row = idx / grid_cols;
+    int col = idx % grid_cols;
 
-    float u = 1.f*col / cols;
-    float v = 1.f*row / rows;
+    float u = 1.f*col / grid_cols;
+    float v = 1.f*row / grid_rows;
 
     glm::vec2 start{u, v};
-    glm::vec2 end = start + glm::vec2{1.f*grid_w/tex->width, 1.f*grid_h/tex->height};
+    glm::vec2 end = start + glm::vec2{1.f*(grid_width-1)/tex->width, 1.f*(grid_height-1)/tex->height};
 
     return {start, end};
 }
@@ -101,8 +130,8 @@ std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
 void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const glm::vec4 &outline, char ch) {
     auto [start, end] = get_char_uv(ch);
 
-    float w = grid_w * scale;
-    float h = grid_h * scale;
+    float w = grid_width * scale;
+    float h = grid_height * scale;
 
     // pos + uv
     std::vector<float> vert{
@@ -136,11 +165,10 @@ void FontAtlas::draw_letter(float x, float y, float scale, const glm::vec4 &fg, 
 }
 
 void FontAtlas::draw_string(float x, float y, float scale, const glm::vec4 &fg, const glm::vec4 &bg, const glm::vec4 &outline, const std::string &str) {
-    int xidx = 0;
+    float xpos = x;
 
     for (char ch: str) {
-        float xcur = x + grid_w*xidx*scale;
-        draw_letter(xcur, y, scale, fg, bg, outline, ch);
-        xidx++;
+        draw_letter(xpos, y, scale, fg, bg, outline, ch);
+        xpos += advance[static_cast<int>(ch)]*em_size*scale;
     }
 }

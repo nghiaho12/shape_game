@@ -29,7 +29,7 @@ struct Texture {
 };
 
 using TexturePtr = std::unique_ptr<Texture, void(*)(Texture*)>;
-TexturePtr make_texture(const char *bmp_path);
+TexturePtr make_texture(const std::string &bmp_path);
 
 struct VertexBuffer {
     GLuint vertex = 0;
