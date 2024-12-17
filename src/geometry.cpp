@@ -211,7 +211,7 @@ void GLPrimitive::draw(const ShaderPtr &shader) {
     glUniform2fv(shader->get_loc("trans"), 1, &trans[0]);
     glUniform4fv(shader->get_loc("color"), 1, &color[0]);
 
-    vertex_buffer->bind();
+    vertex_buffer->use();
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);

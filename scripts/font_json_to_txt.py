@@ -23,6 +23,8 @@ with open(sys.argv[1], "r") as fp:
 a = data["atlas"]
 print(f"distance_range {a['distanceRange']}")
 print(f"em_size {a['size']}")
+print(f"grid_width {a['grid']['cellWidth']}")
+print(f"grid_height {a['grid']['cellHeight']}")
 print("unicode")
 
 for a in data["glyphs"]:

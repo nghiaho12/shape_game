@@ -6,7 +6,6 @@
 #include <glm/vec2.hpp>
 
 // Wrapper around common OpenGL types.
-// These will clear memory on exit.
 
 struct Shader {
     GLuint program = 0;
@@ -36,7 +35,7 @@ struct VertexBuffer {
     GLuint index = 0;
     int index_count = 0;
 
-    void bind() const;
+    void use() const;
     void draw() const;
     void update_vertex(const std::vector<glm::vec2> &v) const;
     void update_vertex(const std::vector<float> &v) const;
@@ -47,5 +46,5 @@ VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const s
 VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index);
 VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index);
 
-// Misc
+void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const VertexBufferPtr &v);
 void enable_gl_debug_callback();

@@ -63,7 +63,7 @@ GLint Shader::get_loc(const char *name) const {
 
 ShaderPtr make_shader(const char *vertex_code, const char *fragment_code) {
     auto cleanup = [](Shader *s) {
-        LOG("deleting shader");
+        LOG("deleting shader: %d %d %d", s->program, s->vertex, s->fragment);
         glDeleteShader(s->vertex);
         glDeleteShader(s->fragment);
         glDeleteProgram(s->program);
@@ -100,7 +100,7 @@ TexturePtr make_texture(const std::string &bmp_path) {
     }
 
     auto cleanup = [](Texture *t) {
-        LOG("deleting texture");
+        LOG("deleting texture: %d", t->id);
         glDeleteTextures(1, &t->id);
     };
                    
@@ -157,7 +157,7 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const 
     return v;
 }
 
-void VertexBuffer::bind() const {
+void VertexBuffer::use() const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
 }
@@ -174,4 +174,21 @@ void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {
 void VertexBuffer::update_vertex(const std::vector<float> &v) const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*v.size(), v.data());
+}
+
+void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const VertexBufferPtr &v) {
+    shader->use();
+    tex->use();
+    v->use();
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+
+    int stride = sizeof(float) * 4;
+    int uv_offset = sizeof(float) * 2;
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(uv_offset));
+
+    glDrawElements(GL_TRIANGLES, v->index_count, GL_UNSIGNED_INT, 0);
 }

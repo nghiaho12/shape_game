@@ -1,7 +1,7 @@
-#include <SDL3/SDL_init.h>
 #define SDL_MAIN_USE_CALLBACKS // use the callbacks instead of main() 
 #define GL_GLEXT_PROTOTYPES
 
+#include <SDL3/SDL_init.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_opengles2.h>
@@ -40,9 +40,13 @@ constexpr float SHAPE_ROTATION_SPEED = M_PI_2;
 
 const glm::vec4 TEXT_FG{231/255.0, 202/255.0, 96/255.0, 1.0};
 const glm::vec4 TEXT_BG{0, 0, 0, 0};
-const glm::vec4 TEXT_OUTLINE{0, 0, 0, 1};
+const glm::vec4 TEXT_OUTLINE{1, 1, 1, 1};
 constexpr float TEXT_OUTLINE_FACTOR = 0.1;
-constexpr float TEXT_PER_OF_WIDTH = 0.005; // text scale as percentage of drawing area width
+
+// units as percentage of drawing width
+constexpr float TEXT_WIDTH = 0.05;
+constexpr float TEXT_X = 0.0;
+constexpr float TEXT_Y = 0.98;
 
 std::map<std::string, glm::vec4> tableau10_palette() {
     const std::map<std::string, uint32_t> color{
@@ -98,6 +102,7 @@ struct AppState {
     float ydiv = 0.f;
 
     GLPrimitive bg;
+    VertexBufferPtr my_name_vertex{{}, {}};
 
     ShaderPtr shape_shader{{}, {}};
     std::vector<Shape> shape_set;
@@ -117,7 +122,8 @@ void update_scale(AppState &as) {
         s->set_scale(scale);
     }
 
-    as.font.set_scale(as.w * TEXT_PER_OF_WIDTH);
+    as.font.set_target_width(as.w * TEXT_WIDTH);
+    as.font.set_trans(glm::vec2{as.xoff + as.w*TEXT_X, as.yoff + as.h*TEXT_Y});
 }
 
 void init_game(AppState &as) {
@@ -242,6 +248,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     if (!init_font(*as, base_path)) {
         return SDL_APP_FAILURE;
     }
+
+    as->my_name_vertex = as->font.make_text("Nghia Ho");
 
     as->shape_shader = make_shape_shader();
         
@@ -512,7 +520,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    as.font.draw_string(as.xoff, as.h/2, "Nghia Ho"); 
+    draw_with_texture(as.font.shader, as.font.tex, as.my_name_vertex);
 
     SDL_GL_SwapWindow(as.window);
 
