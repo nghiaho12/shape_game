@@ -12,7 +12,7 @@ bool compile_shader(GLuint s, const char *shader) {
     glShaderSource(s, 1, static_cast<const GLchar**>(&shader), &length);
     glCompileShader(s);
 
-    GLint status;
+    GLint status = 0;
     glGetShaderiv(s, GL_COMPILE_STATUS, &status);
 
     if (status == GL_FALSE) {
@@ -42,6 +42,12 @@ void debug_callback(GLenum source,
     LOG("GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
            ( type == GL_DEBUG_TYPE_ERROR_KHR ? "** GL ERROR **" : "" ),
             type, severity, message );
+
+    // Unused
+    (void)(source);
+    (void)(id);
+    (void)(length);
+    (void)(userParam);
 }
 
 } // namespace
@@ -160,10 +166,6 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const 
 void VertexBuffer::use() const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
-}
-
-void VertexBuffer::draw() const {
-    glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
 }
 
 void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {

@@ -216,7 +216,7 @@ void GLPrimitive::draw(const ShaderPtr &shader) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-    vertex_buffer->draw();
+    glDrawElements(GL_TRIANGLES, vertex_buffer->index_count, GL_UNSIGNED_INT, 0);
 }
   
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {

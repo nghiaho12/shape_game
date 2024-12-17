@@ -195,23 +195,8 @@ VertexBufferPtr FontAtlas::make_text(const std::string &str) {
 
 void FontAtlas::draw_letter(float x, float y, char ch) {
     std::vector<float> vert = make_letter(x, y, ch);
-
-    shader->use();
-
     letter->update_vertex(vert);
-    letter->use();
-
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-
-    int stride = sizeof(float) * 4;
-    int uv_offset = sizeof(float) * 2;
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(uv_offset));
-
-    tex->use();
-    letter->draw();
+    draw_with_texture(shader, tex, letter);
 }
 
 void FontAtlas::draw_string(float x, float y, const std::string &str) {

@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 project(shape_game)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS "-g")
-set(CMAKE_CXX_FLAGS "-Wall")
+set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -Wpedantic")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(EXECUTABLE_NAME ${PROJECT_NAME})
 set(OpenGL_GL_PREFERENCE LEGACY)

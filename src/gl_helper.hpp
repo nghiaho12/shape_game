@@ -36,7 +36,6 @@ struct VertexBuffer {
     int index_count = 0;
 
     void use() const;
-    void draw() const;
     void update_vertex(const std::vector<glm::vec2> &v) const;
     void update_vertex(const std::vector<float> &v) const;
 };

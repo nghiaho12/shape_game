@@ -67,7 +67,7 @@ std::map<std::string, glm::vec4> tableau10_palette() {
     for (auto it: color) {
         uint32_t c = it.second;
         uint8_t r = c >> 16;
-        uint8_t g = c >> 8 & 0xff;
+        uint8_t g = (c >> 8) & 0xff;
         uint8_t b = c & 0xff;
 
         ret[it.first] = {r/255.f, g/255.f, b/255.f, 1.0f};
@@ -134,15 +134,18 @@ void init_game(AppState &as) {
     // Randomly pick NUM_SHAPE from all the shape set
     std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
 
-    for (int i=0; i < NUM_SHAPES; i++) {
-        as.shape[i] = &as.shape_set[i];
+    int i = 0;
+    for (auto &s: as.shape) {
+        s = &as.shape_set[i];
         as.shape_dst[i] = i;
 
         if (dice_binary(g) > 0.5) {
-            as.shape[i]->rotation_direction = 1;
+            s->rotation_direction = 1;
         } else {
-            as.shape[i]->rotation_direction = -1;
+            s->rotation_direction = -1;
         }
+
+        i++;
     }
 
     // Randomly assign the shape dest position
@@ -200,6 +203,10 @@ bool init_font(AppState &as, const std::string &base_path) {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
+    // Unused
+    (void)argc;
+    (void)argv;
+
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         LOG("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -425,6 +432,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+    // Unused
+    (void)result;
+
     if (appstate) {
         AppState &as = *static_cast<AppState*>(appstate);
         SDL_DestroyRenderer(as.renderer);
