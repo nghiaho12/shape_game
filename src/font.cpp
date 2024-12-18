@@ -48,21 +48,25 @@ void main() {
     float dist_px = screen_px_range*(sd - 0.5) + 0.5;
     float outline_dist = screen_px_range*outline_factor;
 
-    if (dist_px > 0.0 && dist_px < 1.0) { 
-        // inner and start of outline
-        color = mix(outline_color, fg_color, dist_px);
-    } else if (dist_px > -outline_dist && dist_px < -outline_dist + 1.0) {
-        // end of outline and background
-        float opacity = clamp(dist_px + outline_dist, 0.0, 1.0);
-        color = mix(bg_color, outline_color, opacity);
-    } else if (dist_px > -outline_dist && dist_px < 1.0) {
-        color = outline_color;
+    // There's probably some edge case I haven't tested.
+    if (outline_dist > 0.0) {
+        if (dist_px > 0.0 && dist_px < 1.0) { 
+            // inner and start of outline
+            color = mix(outline_color, fg_color, dist_px);
+        } else if (dist_px > -outline_dist && dist_px < -outline_dist + 1.0) {
+            // end of outline and background
+            float opacity = clamp(dist_px + outline_dist, 0.0, 1.0);
+            color = mix(bg_color, outline_color, opacity);
+        } else if (dist_px > -outline_dist && dist_px < 1.0) {
+            color = outline_color;
+        } else {
+            float opacity = clamp(dist_px, 0.0, 1.0);
+            color = mix(bg_color, fg_color, opacity);
+        }
     } else {
         float opacity = clamp(dist_px, 0.0, 1.0);
         color = mix(bg_color, fg_color, opacity);
     }
-
-    // color = vec4(0.5, 0.5, 0.5, 0.5);
 })";
 }
 
@@ -80,7 +84,7 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
     }
 
     // quad for letter
-    std::vector<float> empty_vert(16);
+    std::vector<glm::vec4> empty_vert(4);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     letter = make_vertex_buffer(empty_vert, index);
 
@@ -145,7 +149,7 @@ std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
     return {start, end};
 }
 
-std::vector<float> FontAtlas::make_letter(float x, float y, char ch) {
+std::vector<glm::vec4> FontAtlas::make_letter(float x, float y, char ch) {
     auto [start, end] = get_char_uv(ch);
 
     const Glyph &g = glyph[static_cast<int>(ch)];
@@ -159,18 +163,18 @@ std::vector<float> FontAtlas::make_letter(float x, float y, char ch) {
     y += yoff;
 
     // pos + uv
-    return std::vector<float> {
-        x, y, start.x, start.y,
-        x + w, y,  end.x, start.y,
-        x + w, y - h,  end.x, end.y,
-        x, y - h, start.x, end.y,
+    return std::vector<glm::vec4> {
+        {x, y, start.x, start.y},
+        {x + w, y,  end.x, start.y},
+        {x + w, y - h,  end.x, end.y},
+        {x, y - h, start.x, end.y},
     };
 }
 
-VertexBufferPtr FontAtlas::make_text(const std::string &str) {
+std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> FontAtlas::make_text_vertex(const std::string &str) {
     float xpos = 0;
 
-    std::vector<float> vertex_uv;
+    std::vector<glm::vec4> vertex_uv;
     std::vector<uint32_t> index;
 
     uint32_t vertex_count = 0;
@@ -192,11 +196,16 @@ VertexBufferPtr FontAtlas::make_text(const std::string &str) {
         vertex_count += 4;
     }
 
+    return {vertex_uv, index};
+}
+
+VertexBufferPtr FontAtlas::make_text(const std::string &str) {
+    auto [vertex_uv, index] = make_text_vertex(str);
     return make_vertex_buffer(vertex_uv, index);
 }
 
 void FontAtlas::draw_letter(float x, float y, char ch) {
-    std::vector<float> vert = make_letter(x, y, ch);
+    std::vector<glm::vec4> vert = make_letter(x, y, ch);
     letter->update_vertex(vert);
     draw_with_texture(shader, tex, letter);
 }
@@ -209,11 +218,6 @@ void FontAtlas::draw_string(float x, float y, const std::string &str) {
         const Glyph &g = glyph[static_cast<int>(ch)];
         xpos += g.advance*em_size*distance_scale;
     }
-}
-
-void FontAtlas::set_scale(float scale) {
-    shader->use();
-    glUniform1f(shader->get_loc("scale"), scale);
 }
 
 void FontAtlas::set_trans(const glm::vec2 &trans) {

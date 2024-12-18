@@ -33,6 +33,7 @@
 #include "gl_helper.hpp"
 
 constexpr int NUM_SHAPES = 5;
+constexpr int MAX_SCORE = 10; // score will wrap
 constexpr float ASPECT_RATIO = 4.f/3.f;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
@@ -42,9 +43,8 @@ const glm::vec4 TEXT_FG{231/255.0, 202/255.0, 96/255.0, 1.0};
 const glm::vec4 TEXT_BG{0, 0, 0, 0};
 const glm::vec4 TEXT_OUTLINE{1, 1, 1, 1};
 constexpr float TEXT_OUTLINE_FACTOR = 0.1f;
-
 // units as percentage of drawing width
-constexpr float TEXT_WIDTH = 0.05f;
+constexpr float TEXT_WIDTH = 0.2f;
 constexpr float TEXT_X = 0.f;
 constexpr float TEXT_Y = 0.98f;
 
@@ -88,9 +88,9 @@ struct AppState {
 
     FontAtlas font;
     GLPrimitive letter;
-
     GLuint vao = 0;
 
+    int score = 0;
     bool init = false;
 
     // drawing area within the window
@@ -102,7 +102,8 @@ struct AppState {
     float ydiv = 0.f;
 
     GLPrimitive bg;
-    VertexBufferPtr my_name_vertex{{}, {}};
+    VertexBufferPtr score_vertex{{}, {}};
+    std::pair<glm::vec2, glm::vec2> score_vertex_bbox;
 
     ShaderPtr shape_shader{{}, {}};
     std::vector<Shape> shape_set;
@@ -202,6 +203,12 @@ bool init_font(AppState &as, const std::string &base_path) {
     return true;
 }
 
+void update_score_text(AppState &as) {
+    auto [vertex, index] = as.font.make_text_vertex(std::to_string(as.score));
+    as.score_vertex_bbox = bbox(vertex);
+    as.score_vertex->update_vertex(vertex, index);
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // Unused
     (void)argc;
@@ -256,7 +263,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         return SDL_APP_FAILURE;
     }
 
-    as->my_name_vertex = as->font.make_text("Nghia Ho");
+    // pre-allocate all vertex we need
+    // number of space needs to be >= MAX_SCORE string
+    as->score_vertex = as->font.make_text("    "); 
+    update_score_text(*as);
 
     as->shape_shader = make_shape_shader();
         
@@ -424,7 +434,14 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             auto is_true = [](bool b) { return b; };
             if (std::all_of(as.shape_done.begin(), as.shape_done.end(), is_true)) {
                 as.audio[AudioEnum::WIN].play();
+                as.score++;
+
+                if (as.score > MAX_SCORE) {
+                    as.score = 1;
+                }
+
                 init_game(as);
+                update_score_text(as);
             }
 
             break;
@@ -532,7 +549,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    draw_with_texture(as.font.shader, as.font.tex, as.my_name_vertex);
+    if (as.score > 0) {
+        glm::vec2 text_center = (as.score_vertex_bbox.first + as.score_vertex_bbox.second)*0.5f * as.font.distance_scale;
+        glm::vec2 center{as.xoff + 0.5*as.w - text_center.x, as.yoff + 0.5f*as.h - text_center.y};
+
+        as.font.set_trans(center);
+        draw_with_texture(as.font.shader, as.font.tex, as.score_vertex);
+    }
 
     SDL_GL_SwapWindow(as.window);
 

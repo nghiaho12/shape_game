@@ -2,10 +2,12 @@
 
 #include <SDL3/SDL_opengles2.h>
 #include <memory>
+#include <optional>
 #include <vector>
 #include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 
-// Wrapper around common OpenGL types.
+// Light wrapper around common OpenGL types.
 
 struct Shader {
     GLuint program = 0;
@@ -37,13 +39,16 @@ struct VertexBuffer {
 
     void use() const;
     void update_vertex(const std::vector<glm::vec2> &v) const;
-    void update_vertex(const std::vector<float> &v) const;
+    void update_vertex(const std::vector<glm::vec4> &v, const std::optional<std::vector<uint32_t>> &index={}); // pos + texture uv
 };
 
 using VertexBufferPtr = std::unique_ptr<VertexBuffer, void(*)(VertexBuffer*)>;
+
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const std::vector<uint32_t> &index);
-VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index);
-VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index);
+VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec4> &vertex, const std::vector<uint32_t> &index); // pos + texture uv
+VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index); 
 
 void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const VertexBufferPtr &v);
+std::pair<glm::vec2, glm::vec2> bbox(const std::vector<glm::vec4> &vertex);   
 void enable_gl_debug_callback();
+

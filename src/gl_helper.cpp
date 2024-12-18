@@ -137,8 +137,8 @@ VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const s
     return make_vertex_buffer(&vertex[0].x, static_cast<int>(2*vertex.size()), index);
 }
 
-VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index) {
-    return make_vertex_buffer(vertex.data(), static_cast<int>(vertex.size()), index);
+VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec4> &vertex, const std::vector<uint32_t> &index) {
+    return make_vertex_buffer(&vertex[0].x, static_cast<int>(4*vertex.size()), index);
 }
 
 VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index) {
@@ -173,9 +173,15 @@ void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec2)*v.size()), v.data());
 }
 
-void VertexBuffer::update_vertex(const std::vector<float> &v) const {
+void VertexBuffer::update_vertex(const std::vector<glm::vec4> &v, const std::optional<std::vector<uint32_t>> &idx) {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(float)*v.size()), v.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec4)*v.size()), v.data());
+
+    if (idx) {
+        glBindBuffer(GL_ARRAY_BUFFER, index);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(idx->size()), idx->data());
+        index_count = static_cast<int>(idx->size());
+    }
 }
 
 void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const VertexBufferPtr &v) {
@@ -193,4 +199,21 @@ void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const Ver
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(uv_offset));
 
     glDrawElements(GL_TRIANGLES, v->index_count, GL_UNSIGNED_INT, 0);
+}
+
+std::pair<glm::vec2, glm::vec2> bbox(const std::vector<glm::vec4> &vertex) {
+    float x0 = vertex[0].x;
+    float x1 = vertex[0].x;
+    float y0 = vertex[0].y;
+    float y1 = vertex[0].y;
+
+    for (const auto &v: vertex) {
+        x0 = std::min(x0, v.x);
+        x1 = std::max(x1, v.x);
+
+        y0 = std::min(y0, v.y);
+        y1 = std::max(y1, v.y);
+    }
+
+    return {glm::vec2{x0, y0}, glm::vec2{x1, y1}};
 }
