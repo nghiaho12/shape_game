@@ -2,7 +2,6 @@
 
 #include <SDL3/SDL_opengles2.h>
 #include <memory>
-#include <optional>
 #include <vector>
 #include <string>
 #include <glm/vec2.hpp>
@@ -40,7 +39,7 @@ struct VertexBuffer {
 
     void use() const;
     void update_vertex(const std::vector<glm::vec2> &v) const;
-    void update_vertex(const std::vector<glm::vec4> &v, const std::optional<std::vector<uint32_t>> &index={}); // pos + texture uv
+    void update_vertex(const std::vector<glm::vec4> &v, const std::vector<uint32_t> &optional_index={}); // pos + texture uv
 };
 
 using VertexBufferPtr = std::unique_ptr<VertexBuffer, void(*)(VertexBuffer*)>;

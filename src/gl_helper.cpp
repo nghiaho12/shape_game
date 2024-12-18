@@ -152,7 +152,7 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const 
 
     glGenBuffers(1, &v->vertex);
     glBindBuffer(GL_ARRAY_BUFFER, v->vertex);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(float)*vertex_count), vertex, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(float)*static_cast<uint32_t>(vertex_count)), vertex, GL_DYNAMIC_DRAW);
 
     glGenBuffers(1, &v->index);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v->index);
@@ -173,14 +173,14 @@ void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec2)*v.size()), v.data());
 }
 
-void VertexBuffer::update_vertex(const std::vector<glm::vec4> &v, const std::optional<std::vector<uint32_t>> &idx) {
+void VertexBuffer::update_vertex(const std::vector<glm::vec4> &v, const std::vector<uint32_t> &optional_idx) {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec4)*v.size()), v.data());
 
-    if (idx) {
+    if (!optional_idx.empty()) {
         glBindBuffer(GL_ARRAY_BUFFER, index);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(idx->size()), idx->data());
-        index_count = static_cast<int>(idx->size());
+        glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(optional_idx.size()), optional_idx.data());
+        index_count = static_cast<int>(optional_idx.size());
     }
 }
 
