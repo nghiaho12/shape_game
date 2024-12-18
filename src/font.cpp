@@ -1,6 +1,6 @@
 #include <SDL3/SDL_surface.h>
 #include <memory>
-#include <fstream>
+#include <sstream>
 
 #include "font.hpp"
 #include "gl_helper.hpp"
@@ -88,43 +88,46 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
     letter = make_vertex_buffer(empty_vert, index);
 
-    std::ifstream in(atlas_txt);
-    
-    if (!in) {
-        LOG("failed to open: %s", atlas_txt.c_str());
-        return false;
+    size_t data_size;
+    char *data = static_cast<char*>(SDL_LoadFile(atlas_txt.c_str(), &data_size));
+
+    if (!data) {
+        LOG("Failed to open file '%s'.", atlas_txt.c_str());
+        return {};
     }
 
-    std::string label;
+    std::string str(data);
+    std::stringstream ss(str);
 
-    in >> label; assert(label == "distance_range");
-    in >> distance_range;
-    in >> label; assert(label == "em_size");
-    in >> em_size;
-    in >> label; assert(label == "grid_width");
-    in >> grid_width;
-    in >> label; assert(label == "grid_height");
-    in >> grid_height;
-    in >> label; assert(label == "unicode");
+    std::string label;
+    ss >> label; assert(label == "distance_range");
+    ss >> distance_range;
+    ss >> label; assert(label == "em_size");
+    ss >> em_size;
+    ss >> label; assert(label == "grid_width");
+    ss >> grid_width;
+    ss >> label; assert(label == "grid_height");
+    ss >> grid_height;
+    ss >> label; assert(label == "unicode");
 
     while (true) {
         int unicode;
-        in >> unicode;
+        ss >> unicode;
 
-        if (in.eof()) {
+        if (ss.eof()) {
             break;
         }
 
         Glyph g;
-        in >> g.advance;
-        in >> g.plane_left;
-        in >> g.plane_bottom;
-        in >> g.plane_right;
-        in >> g.plane_top;
-        in >> g.atlas_left;
-        in >> g.atlas_bottom;
-        in >> g.atlas_right;
-        in >> g.atlas_top;
+        ss >> g.advance;
+        ss >> g.plane_left;
+        ss >> g.plane_bottom;
+        ss >> g.plane_right;
+        ss >> g.plane_top;
+        ss >> g.atlas_left;
+        ss >> g.atlas_bottom;
+        ss >> g.atlas_right;
+        ss >> g.atlas_top;
 
         glyph[unicode] = g;
     }
