@@ -235,7 +235,7 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
         return it->second;
     };
 
-    for (int sides=3; sides <= 8; sides++) {
+    for (int sides=3; sides <= 9; sides++) {
         Shape s = make_shape_polygon(sides, {1.f}, line_thickness, line_color, next_color());
         ret.push_back(std::move(s));
     }
@@ -246,16 +246,13 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     Shape oval = make_oval(1.f, line_thickness, line_color, next_color());
     ret.push_back(std::move(oval));
 
-    for (int i=0; i < 3; i++) {
+    for (int i=0; i < 4; i++) {
         Shape star = make_shape_polygon(8 + i*2, {1.0f, 0.5f}, line_thickness, line_color, next_color());
         ret.push_back(std::move(star));
     }
 
-    Shape rhombus = make_shape_polygon(4, {1.0f, 0.5f}, line_thickness, line_color, next_color());
+    Shape rhombus = make_shape_polygon(4, {1.0f, 0.8f}, line_thickness, line_color, next_color());
     ret.push_back(std::move(rhombus));
-
-    Shape crystal = make_shape_polygon(5, {1.0f, 0.5f, 0.5f, 0.5f, 0.5f}, line_thickness, line_color, next_color());
-    ret.push_back(std::move(crystal));
 
     return ret;
 }
