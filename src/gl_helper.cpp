@@ -53,8 +53,10 @@ void debug_callback(GLenum source,
 } // namespace
 
 void enable_gl_debug_callback() {
+#ifndef __EMSCRIPTEN__
     glEnable(GL_DEBUG_OUTPUT_KHR);
     glDebugMessageCallbackKHR(debug_callback, 0);
+#endif
 }
 
 void Shader::use() const {

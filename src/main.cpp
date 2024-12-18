@@ -242,7 +242,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES); 
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 
-    if (!SDL_CreateWindowAndRenderer("shape", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
+    if (!SDL_CreateWindowAndRenderer("Shape Game", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
         LOG("SDL_CreateWindowAndRenderer failed");
         return SDL_APP_FAILURE;
     }    
@@ -255,9 +255,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 #ifndef __EMSCRIPTEN__
     as->gl_ctx = SDL_GL_CreateContext(as->window);
     SDL_GL_MakeCurrent(as->window, as->gl_ctx);
-#endif
-
     enable_gl_debug_callback();
+#endif
 
     if (!init_font(*as, base_path)) {
         return SDL_APP_FAILURE;

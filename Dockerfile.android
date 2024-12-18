@@ -53,11 +53,11 @@ RUN cd /SDL/build/org.libsdl.shape_game/app/jni/src && \
 RUN apt install -y imagemagick
 
 # Build our actual project
-COPY Android.mk /SDL/build/org.libsdl.shape_game/app/jni/src
 COPY src /SDL/build/org.libsdl.shape_game/app/jni/src/
 COPY assets /SDL/build/org.libsdl.shape_game/app/src/main/assets/
-COPY res/values /SDL/build/org.libsdl.shape_game/app/src/main/res/values/
-COPY res/ic_launcher.png /
+COPY android/Android.mk /SDL/build/org.libsdl.shape_game/app/jni/src
+COPY android/res/values /SDL/build/org.libsdl.shape_game/app/src/main/res/values/
+COPY android/res/ic_launcher.png /
 
 RUN cd /SDL/build/org.libsdl.shape_game/app/src/main/res && \
     cp /ic_launcher.png mipmap-xxxhdpi/ && \

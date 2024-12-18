@@ -40,7 +40,8 @@ COPY assets/ /shape_game/assets/
 
 RUN mkdir build && \
     cd build && \
-    /bin/bash -c ". /emsdk/emsdk_env.sh && emcmake cmake .. && VERBOSE=1 emmake make" && \
-    ln -s shape_game.html index.html
+    /bin/bash -c ". /emsdk/emsdk_env.sh && emcmake cmake .. && VERBOSE=1 emmake make"
+
+COPY wasm/index.html /shape_game/build
 
 CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/shape_game/build"]
