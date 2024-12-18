@@ -137,8 +137,10 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
 std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
     const Glyph &g = glyph[static_cast<int>(ch)];
 
-    glm::vec2 start{g.atlas_left/tex->width, 1 - g.atlas_bottom/tex->height};
-    glm::vec2 end{g.atlas_right/tex->width, 1  - g.atlas_top/tex->height};
+    float w = static_cast<float>(tex->width);
+    float h = static_cast<float>(tex->height);
+    glm::vec2 start{g.atlas_left/w, 1 - g.atlas_bottom/h};
+    glm::vec2 end{g.atlas_right/w, 1  - g.atlas_top/h};
 
     return {start, end};
 }
@@ -171,7 +173,7 @@ VertexBufferPtr FontAtlas::make_text(const std::string &str) {
     std::vector<float> vertex_uv;
     std::vector<uint32_t> index;
 
-    int vertex_count = 0;
+    uint32_t vertex_count = 0;
 
     for (char ch: str) {
         auto v = make_letter(xpos, 0, ch);
@@ -221,7 +223,7 @@ void FontAtlas::set_trans(const glm::vec2 &trans) {
 
 void FontAtlas::set_target_width(float pixel) {
     shader->use();
-    float scale = pixel / grid_width;
+    float scale = pixel / static_cast<float>(grid_width);
     glUniform1f(shader->get_loc("scale"), scale);
     glUniform1f(shader->get_loc("distance_scale"), scale);
     this->distance_scale = scale;

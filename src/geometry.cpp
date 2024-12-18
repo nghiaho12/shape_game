@@ -41,9 +41,9 @@ std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius)
     std::vector<glm::vec2> vert;
 
     for (int i=0; i < sides; i++) {
-        float theta = i * 2*M_PI / sides;
+        float theta = static_cast<float>(i * 2*M_PI / sides);
 
-        float r = radius[(i % radius.size())];
+        float r = radius[static_cast<size_t>(i) % radius.size()];
         float x = r*std::cos(theta);
         float y = r*std::sin(theta);
 
@@ -60,12 +60,12 @@ VertexIndex make_fill(const std::vector<glm::vec2> &vert) {
     fill_vert = vert;
     fill_vert.push_back(glm::vec2{0.0f, 0.0f}); // cener of shape
 
-    for (int i=0; i < static_cast<int>(vert.size()); i++) {
-        int j = (i + 1) % vert.size();
+    for (size_t i=0; i < vert.size(); i++) {
+        uint32_t j = static_cast<uint32_t>((i + 1) % vert.size());
 
-        fill_idx.push_back(i);
+        fill_idx.push_back(static_cast<uint32_t>(i));
         fill_idx.push_back(j);
-        fill_idx.push_back(fill_vert.size() - 1);
+        fill_idx.push_back(static_cast<uint32_t>(fill_vert.size() - 1));
     }
 
     return {fill_vert, fill_idx};
@@ -77,8 +77,8 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     std::vector<uint32_t> tri_idx;
     std::vector<glm::vec2> inner, outer;
 
-    for (int i=0; i < static_cast<int>(vert.size()); i++) {
-        int j = (i + 1) % vert.size();
+    for (size_t i=0; i < vert.size(); i++) {
+        size_t j = (i + 1) % vert.size();
 
         glm::vec2 v = vert[j] - vert[i];
         v /= glm::length(v);
@@ -86,13 +86,14 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
         // normal to the line
         glm::vec2 n{-v[1], v[0]};
 
-        tri_idx.push_back(tri_pts.size() + 0);
-        tri_idx.push_back(tri_pts.size() + 1);
-        tri_idx.push_back(tri_pts.size() + 2);
+        uint32_t idx = static_cast<uint32_t>(tri_pts.size());
 
-        tri_idx.push_back(tri_pts.size() + 0);
-        tri_idx.push_back(tri_pts.size() + 2);
-        tri_idx.push_back(tri_pts.size() + 3);
+        tri_idx.push_back(idx + 0);
+        tri_idx.push_back(idx + 1);
+        tri_idx.push_back(idx + 2);
+        tri_idx.push_back(idx + 0);
+        tri_idx.push_back(idx + 2);
+        tri_idx.push_back(idx + 3);
 
         tri_pts.push_back(vert[i] + n*thickness*0.5f);
         tri_pts.push_back(vert[j] + n*thickness*0.5f);
@@ -106,8 +107,8 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     }
 
      // miter
-    for (int i=0; i < static_cast<int>(vert.size()); i++) {
-        int j = (i + 1) % vert.size();
+    for (size_t i=0; i < vert.size(); i++) {
+        size_t j = (i + 1) % vert.size();
 
         for (const auto &pts: {inner, outer}) {
             glm::vec2 p0 = pts[i*2];
@@ -128,17 +129,16 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
 
             double det = v0[0]*(-v1[1]) - (-v1[0]*v0[1]);
             double c0 =  b[0]*(-v1[1]) - (-v1[0]*b[1]);
-            float t0 = c0 / det;
+            float t0 = static_cast<float>(c0 / det);
 
             glm::vec2 pp = p0 + v0*t0;
 
-            tri_idx.push_back(tri_pts.size() + 0);
-            tri_idx.push_back(tri_pts.size() + 1);
-            tri_idx.push_back(tri_pts.size() + 2);
-
-            tri_idx.push_back(tri_pts.size() + 0);
-            tri_idx.push_back(tri_pts.size() + 1);
-            tri_idx.push_back(tri_pts.size() + 3);
+            uint32_t idx = static_cast<uint32_t>(tri_pts.size());
+            tri_idx.push_back(idx + 0);
+            tri_idx.push_back(idx + 1);
+            tri_idx.push_back(idx + 0);
+            tri_idx.push_back(idx + 1);
+            tri_idx.push_back(idx + 3);
 
             tri_pts.push_back(vert[j]);
             tri_pts.push_back(pp);
@@ -191,10 +191,10 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
 
     int sides = 36;
     for (int i=0; i < sides; i++) {
-        float theta = i * 2*M_PI / sides;
+        float theta = static_cast<float>(i * 2*M_PI / sides);
 
         float x = radius*std::cos(theta);
-        float y = radius*0.5*std::sin(theta);
+        float y = static_cast<float>(radius*0.5*std::sin(theta));
 
         vert.push_back(glm::vec2{x, y});
     }
@@ -226,7 +226,7 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
 
     std::vector<Shape> ret;
 
-    int idx = 0;
+    size_t idx = 0;
     auto next_color = [&]() -> glm::vec4 {
         auto it = palette.begin();
         std::advance(it, idx);

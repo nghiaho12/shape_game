@@ -33,20 +33,20 @@
 #include "gl_helper.hpp"
 
 constexpr int NUM_SHAPES = 5;
-constexpr float ASPECT_RATIO = 4.0/3.0;
+constexpr float ASPECT_RATIO = 4.f/3.f;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
-constexpr float SHAPE_ROTATION_SPEED = M_PI_2;
+constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
 
 const glm::vec4 TEXT_FG{231/255.0, 202/255.0, 96/255.0, 1.0};
 const glm::vec4 TEXT_BG{0, 0, 0, 0};
 const glm::vec4 TEXT_OUTLINE{1, 1, 1, 1};
-constexpr float TEXT_OUTLINE_FACTOR = 0.1;
+constexpr float TEXT_OUTLINE_FACTOR = 0.1f;
 
 // units as percentage of drawing width
-constexpr float TEXT_WIDTH = 0.05;
-constexpr float TEXT_X = 0.0;
-constexpr float TEXT_Y = 0.98;
+constexpr float TEXT_WIDTH = 0.05f;
+constexpr float TEXT_X = 0.f;
+constexpr float TEXT_Y = 0.98f;
 
 std::map<std::string, glm::vec4> tableau10_palette() {
     const std::map<std::string, uint32_t> color{
@@ -66,7 +66,7 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 
     for (auto it: color) {
         uint32_t c = it.second;
-        uint8_t r = c >> 16;
+        uint8_t r = static_cast<uint8_t>(c >> 16);
         uint8_t g = (c >> 8) & 0xff;
         uint8_t b = c & 0xff;
 
@@ -107,10 +107,10 @@ struct AppState {
     ShaderPtr shape_shader{{}, {}};
     std::vector<Shape> shape_set;
     std::array<Shape*, NUM_SHAPES> shape;
-    std::array<int, NUM_SHAPES> shape_dst;
+    std::array<size_t, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
-    int selected_shape = -1;
-    int highlight_dst = -1;
+    std::optional<size_t> selected_shape;
+    std::optional<size_t> highlight_dst;
 
     uint64_t last_tick = 0;
 };
@@ -134,7 +134,7 @@ void init_game(AppState &as) {
     // Randomly pick NUM_SHAPE from all the shape set
     std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
 
-    int i = 0;
+    size_t i = 0;
     for (auto &s: as.shape) {
         s = &as.shape_set[i];
         as.shape_dst[i] = i;
@@ -155,8 +155,8 @@ void init_game(AppState &as) {
         b = false;
     }
 
-    as.selected_shape = -1;
-    as.highlight_dst = -1;
+    as.selected_shape.reset();
+    as.highlight_dst.reset();
 
     update_scale(as);
 }
@@ -168,7 +168,7 @@ bool init_audio(AppState &as, const std::string &base_path) {
         return false;
     }
 
-    if (auto w = load_ogg(as.audio_device, (base_path + "bgm.ogg").c_str(), 0.1)) {
+    if (auto w = load_ogg(as.audio_device, (base_path + "bgm.ogg").c_str(), 0.1f)) {
         as.audio[AudioEnum::BGM] = *w;
     } else {
         return false;
@@ -294,23 +294,26 @@ bool recalc_drawing_area(AppState &as) {
     emscripten_set_canvas_element_size("#canvas", win_w, win_h);
 #endif
 
+    float win_wf = static_cast<float>(win_w);
+    float win_hf = static_cast<float>(win_h);
+
     if (win_w > win_h) {
-        as.h = win_h;
-        as.w = win_h * ASPECT_RATIO;
-        as.xoff = (win_w - as.w)/2;
+        as.h = win_hf;
+        as.w = win_hf * ASPECT_RATIO;
+        as.xoff = (win_wf - as.w)/2;
         as.yoff = 0;
     } else {
-        as.w = win_w;
-        as.h = win_w / ASPECT_RATIO;
+        as.w = win_wf;
+        as.h = win_wf / ASPECT_RATIO;
         as.xoff = 0;
-        as.yoff = (win_h - as.h) /2;
+        as.yoff = (win_hf - as.h) /2;
     }
 
     as.xdiv = as.w*1.f / NUM_SHAPES;
-    as.ydiv = as.h / 4.0f;
+    as.ydiv = as.h / 4.f;
 
     glViewport(0, 0, win_w, win_h);
-    glm::mat4 ortho = glm::ortho(0.0f, win_w*1.0f, win_h*1.0f, 0.0f);
+    glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
    
     as.shape_shader->use();
     glUniformMatrix4fv(as.shape_shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
@@ -332,21 +335,21 @@ void update_background(const AppState &as) {
     as.bg.vertex_buffer->update_vertex(bg);
 }
 
-glm::vec2 shape_index_to_src_pos(const AppState &as, int idx) {
-    return glm::vec2{as.xoff + (idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv};
+glm::vec2 shape_index_to_src_pos(const AppState &as, size_t idx) {
+    return glm::vec2{as.xoff + static_cast<float>(idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv};
 }
 
-glm::vec2 shape_index_to_dst_pos(const AppState &as, int idx) {
-    return glm::vec2{as.xoff + (idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv*3};
+glm::vec2 shape_index_to_dst_pos(const AppState &as, size_t idx) {
+    return glm::vec2{as.xoff + static_cast<float>(idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv*3};
 }
 
-int find_selected_shape(const AppState &as, bool dst) {
+std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
     float cx, cy;
     SDL_GetMouseState(&cx, &cy);
 
-    int selected_shape = -1;
+    std::optional<size_t> selected_shape;
 
-    for (int i=0; i < NUM_SHAPES; i++) {
+    for (size_t i=0; i < NUM_SHAPES; i++) {
         glm::vec2 pos;
 
         if (dst) {
@@ -364,7 +367,7 @@ int find_selected_shape(const AppState &as, bool dst) {
         float r = s.radius * s.line.scale;
 
         if (dx < r && dy < r) {
-            selected_shape = i;
+            selected_shape = static_cast<int>(i);
             break;
         }
     }
@@ -397,26 +400,26 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             break;
 
         case SDL_EVENT_MOUSE_MOTION:
-            as.highlight_dst = -1;
+            as.highlight_dst.reset();
 
-            if (as.selected_shape != -1) {
+            if (as.selected_shape) {
                 as.highlight_dst = find_selected_shape(as, true);
             }
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            as.highlight_dst = -1;
+            as.highlight_dst.reset();
 
-            if (as.selected_shape != -1) {
-                int dst_idx = find_selected_shape(as, true);
+            if (as.selected_shape) {
+                std::optional<size_t> dst_idx = find_selected_shape(as, true);
 
-                if (as.shape_dst[as.selected_shape] == dst_idx) {
-                    as.shape_done[as.selected_shape] = true;
+                if (dst_idx && as.shape_dst[*as.selected_shape] == *dst_idx) {
+                    as.shape_done[*as.selected_shape] = true;
                     as.audio[AudioEnum::CORRECT].play();
                 }
             }
 
-            as.selected_shape = -1;
+            as.selected_shape.reset();
 
             // check if we won
             auto is_true = [](bool b) { return b; };
@@ -459,7 +462,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState &as = *static_cast<AppState*>(appstate);
 
-    float dt = (SDL_GetTicksNS() - as.last_tick) * 1e-9f;
+    float dt = static_cast<float>(SDL_GetTicksNS() - as.last_tick) * 1e-9f;
     as.last_tick = SDL_GetTicksNS();
 
     auto &bgm = as.audio[AudioEnum::BGM];
@@ -491,9 +494,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     as.bg.draw(as.shape_shader);
 
-    for (int i=0; i < static_cast<int>(as.shape.size()); i++) {
+    for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = *as.shape[i];
-        int dst_idx = as.shape_dst[i];
+        size_t dst_idx = as.shape_dst[i];
 
         if (as.shape_done[i]) {
             s.set_trans(shape_index_to_dst_pos(as, dst_idx));
@@ -501,7 +504,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             s.fill.draw(as.shape_shader);
             s.line.draw(as.shape_shader);
         } else {
-            if (i == as.selected_shape) {
+            if (static_cast<int>(i) == as.selected_shape) {
                 s.set_trans(glm::vec2{cx, cy});
             } else {
                 s.set_trans(shape_index_to_src_pos(as, i));
@@ -509,7 +512,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
             float theta = s.line.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
             if (theta < 0) {
-                theta = 2*M_PI;
+                theta = static_cast<float>(2*M_PI);
             } else if (theta > 2*M_PI) {
                 theta = 0.f;
             }
@@ -520,7 +523,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             s.line.draw(as.shape_shader);
 
             // destination shape
-            if (as.highlight_dst == dst_idx) {
+            if (as.highlight_dst == static_cast<int>(dst_idx)) {
                 s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
                 s.line_highlight.draw(as.shape_shader);
             } else {

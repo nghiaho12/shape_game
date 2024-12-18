@@ -24,7 +24,7 @@ struct GLPrimitive {
 
 struct Shape {
     float radius = 1.0f;
-    int rotation_direction = 1;
+    float rotation_direction = 1.f;
 
     GLPrimitive line;
     GLPrimitive line_highlight;

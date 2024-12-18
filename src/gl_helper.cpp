@@ -8,7 +8,7 @@
 
 namespace {
 bool compile_shader(GLuint s, const char *shader) {
-    int length = strlen(shader);
+    GLint length = static_cast<GLint>(strlen(shader));
     glShaderSource(s, 1, static_cast<const GLchar**>(&shader), &length);
     glCompileShader(s);
 
@@ -19,7 +19,7 @@ bool compile_shader(GLuint s, const char *shader) {
         GLint len = 0;
         glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
 
-        std::vector<GLchar> error(len);
+        std::vector<GLchar> error(static_cast<size_t>(len));
         glGetShaderInfoLog(s, len, &len, error.data());
 
         if (len > 0) {
@@ -134,11 +134,11 @@ void Texture::use() const {
 }
 
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const std::vector<uint32_t> &index) {
-    return make_vertex_buffer(&vertex[0].x, 2*vertex.size(), index);
+    return make_vertex_buffer(&vertex[0].x, static_cast<int>(2*vertex.size()), index);
 }
 
 VertexBufferPtr make_vertex_buffer(const std::vector<float> &vertex, const std::vector<uint32_t> &index) {
-    return make_vertex_buffer(vertex.data(), vertex.size(), index);
+    return make_vertex_buffer(vertex.data(), static_cast<int>(vertex.size()), index);
 }
 
 VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index) {
@@ -152,13 +152,13 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const 
 
     glGenBuffers(1, &v->vertex);
     glBindBuffer(GL_ARRAY_BUFFER, v->vertex);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*vertex_count, vertex, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(float)*vertex_count), vertex, GL_DYNAMIC_DRAW);
 
     glGenBuffers(1, &v->index);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v->index);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*index.size(), index.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint32_t)*index.size()), index.data(), GL_STATIC_DRAW);
 
-    v->index_count = index.size();
+    v->index_count = static_cast<int>(index.size());
 
     return v;
 }
@@ -170,12 +170,12 @@ void VertexBuffer::use() const {
 
 void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::vec2)*v.size(), v.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec2)*v.size()), v.data());
 }
 
 void VertexBuffer::update_vertex(const std::vector<float> &v) const {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*v.size(), v.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(float)*v.size()), v.data());
 }
 
 void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const VertexBufferPtr &v) {

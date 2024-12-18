@@ -7,7 +7,7 @@
 
 void Audio::play() {
     if (stream) {
-        SDL_PutAudioStreamData(stream, data.data(), data.size());
+        SDL_PutAudioStreamData(stream, data.data(), static_cast<int>(data.size()));
         SDL_ResumeAudioStreamDevice(stream);
     }
 }
@@ -15,7 +15,7 @@ void Audio::play() {
 namespace {
 std::vector<uint8_t> change_volume(const std::vector<uint8_t> &data, SDL_AudioSpec spec, float volume) {
     std::vector<uint8_t> ret(data.size());
-    SDL_MixAudio(ret.data(), data.data(), spec.format, data.size(), volume);
+    SDL_MixAudio(ret.data(), data.data(), spec.format, static_cast<Uint32>(data.size()), volume);
     return ret;
 }
 
@@ -55,9 +55,9 @@ std::optional<Audio> load_ogg(SDL_AudioDeviceID audio_device, const char *path, 
     Audio ret;
 
     short *output;
-    int samples = stb_vorbis_decode_memory(data, data_size, &ret.spec.channels, &ret.spec.freq, &output);
+    int samples = stb_vorbis_decode_memory(data, static_cast<int>(data_size), &ret.spec.channels, &ret.spec.freq, &output);
   
-    ret.data.resize(samples * ret.spec.channels * sizeof(short));
+    ret.data.resize(static_cast<size_t>(samples * ret.spec.channels) * sizeof(short));
     memcpy(ret.data.data(), output, ret.data.size());
 
     free(output);
