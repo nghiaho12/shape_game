@@ -376,7 +376,7 @@ std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
         float r = s.radius * s.line.scale;
 
         if (dx < r && dy < r) {
-            selected_shape = static_cast<int>(i);
+            selected_shape = i;
             break;
         }
     }
@@ -422,7 +422,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             if (as.selected_shape) {
                 std::optional<size_t> dst_idx = find_selected_shape(as, true);
 
-                if (dst_idx && as.shape_dst[*as.selected_shape] == *dst_idx) {
+                if (as.shape_dst[*as.selected_shape] == dst_idx) {
                     as.shape_done[*as.selected_shape] = true;
                     as.audio[AudioEnum::CORRECT].play();
                 }
@@ -520,7 +520,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             s.fill.draw(as.shape_shader);
             s.line.draw(as.shape_shader);
         } else {
-            if (static_cast<int>(i) == as.selected_shape) {
+            if (i == as.selected_shape) {
                 s.set_trans(glm::vec2{cx, cy});
             } else {
                 s.set_trans(shape_index_to_src_pos(as, i));
@@ -539,7 +539,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             s.line.draw(as.shape_shader);
 
             // destination shape
-            if (as.highlight_dst == static_cast<int>(dst_idx)) {
+            if (as.highlight_dst == dst_idx) {
                 s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
                 s.line_highlight.draw(as.shape_shader);
             } else {
