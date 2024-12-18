@@ -13,17 +13,19 @@ LOCAL_SRC_FILES := \
     stb_vorbis.hpp \
     audio.cpp \
     audio.hpp \
-    shader.cpp \
-    shader.hpp \
+    font.cpp \
+    font.hpp \
+    gl_helper.cpp \
+    gl_helper.hpp \
     log.hpp
-
-SDL_PATH := ../SDL  # SDL
+ 
+SDL_PATH := ../SDL  # SDL \
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include  # SDL
 
 LOCAL_SHARED_LIBRARIES := SDL3
 
-LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid  # SDL
+LOCAL_LDLIBS := -lGLESv1_CM -lGLESv3 -lOpenSLES -llog -landroid  # SDL
 
 include $(BUILD_SHARED_LIBRARY)
 
