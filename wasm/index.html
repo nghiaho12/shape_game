@@ -182,10 +182,11 @@ canvas.emscripten { border: 0px none; background-color: black; width: 100vh; hei
         totalDependencies: 0,
         monitorRunDependencies: (left) => {
           this.totalDependencies = Math.max(this.totalDependencies, left);
-          Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+          Module.setStatus(left ? 'Preparing... ' : 'All downloads complete.');
+          <!-- Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.'); -->
         }
       };
-      Module.setStatus('Downloading...');
+      Module.setStatus(' GameDownloading...');
       window.onerror = (event) => {
         // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
         Module.setStatus('Exception thrown, see JavaScript console');
