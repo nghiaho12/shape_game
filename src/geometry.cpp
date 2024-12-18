@@ -42,7 +42,6 @@ std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius)
 
     for (int i=0; i < sides; i++) {
         float theta = static_cast<float>(i * 2*M_PI / sides);
-
         float r = radius[static_cast<size_t>(i) % radius.size()];
         float x = r*std::cos(theta);
         float y = r*std::sin(theta);
@@ -134,8 +133,10 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
             glm::vec2 pp = p0 + v0*t0;
 
             uint32_t idx = static_cast<uint32_t>(tri_pts.size());
+
             tri_idx.push_back(idx + 0);
             tri_idx.push_back(idx + 1);
+            tri_idx.push_back(idx + 2);
             tri_idx.push_back(idx + 0);
             tri_idx.push_back(idx + 1);
             tri_idx.push_back(idx + 3);
@@ -192,9 +193,8 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     int sides = 36;
     for (int i=0; i < sides; i++) {
         float theta = static_cast<float>(i * 2*M_PI / sides);
-
         float x = radius*std::cos(theta);
-        float y = static_cast<float>(radius*0.5*std::sin(theta));
+        float y = radius*std::sin(theta)*0.5f;
 
         vert.push_back(glm::vec2{x, y});
     }
