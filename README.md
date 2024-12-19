@@ -21,6 +21,8 @@ sudo apt install docker-ce
 ```
 
 ## Linux
+Install SDL 3 (https://github.com/libsdl-org/SDL/)
+
 ```
 mkdir build
 cd build
