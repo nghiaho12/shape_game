@@ -1,46 +1,45 @@
-#define SDL_MAIN_USE_CALLBACKS // use the callbacks instead of main() 
+#define SDL_MAIN_USE_CALLBACKS  // use the callbacks instead of main()
 #define GL_GLEXT_PROTOTYPES
 
-#include <SDL3/SDL_init.h>
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_init.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_opengles2.h>
 #include <SDL3/SDL_timer.h>
 
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp> 
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-#include <vector>
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
-#include <array>
-#include <algorithm>
-#include <random>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 #include <map>
 #include <optional>
+#include <random>
+#include <vector>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #endif
 
-#include "log.hpp"
-#include "geometry.hpp"
 #include "audio.hpp"
 #include "font.hpp"
+#include "geometry.hpp"
 #include "gl_helper.hpp"
+#include "log.hpp"
 
 constexpr int NUM_SHAPES = 5;
-constexpr int MAX_SCORE = 100; // score will wrap
-constexpr float ASPECT_RATIO = 4.f/3.f;
+constexpr int MAX_SCORE = 100;  // score will wrap
+constexpr float ASPECT_RATIO = 4.f / 3.f;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
 constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
 
-const glm::vec4 TEXT_FG{231/255.0, 202/255.0, 96/255.0, 1.0};
+const glm::vec4 TEXT_FG{231 / 255.0, 202 / 255.0, 96 / 255.0, 1.0};
 const glm::vec4 TEXT_BG{0, 0, 0, 0};
 const glm::vec4 TEXT_OUTLINE{1, 1, 1, 1};
 constexpr float TEXT_OUTLINE_FACTOR = 0.1f;
@@ -65,19 +64,19 @@ std::map<std::string, glm::vec4> tableau10_palette() {
 
     std::map<std::string, glm::vec4> ret;
 
-    for (auto it: color) {
+    for (auto it : color) {
         uint32_t c = it.second;
         uint8_t r = static_cast<uint8_t>(c >> 16);
         uint8_t g = (c >> 8) & 0xff;
         uint8_t b = c & 0xff;
 
-        ret[it.first] = {r/255.f, g/255.f, b/255.f, 1.0f};
+        ret[it.first] = {r / 255.f, g / 255.f, b / 255.f, 1.0f};
     }
 
     return ret;
 }
 
-enum class AudioEnum {BGM, CORRECT, WIN};
+enum class AudioEnum { BGM, CORRECT, WIN };
 
 struct AppState {
     SDL_Window *window = nullptr;
@@ -97,14 +96,14 @@ struct AppState {
     glm::vec2 draw_area_offset;
     glm::vec2 draw_area_size;
     glm::vec2 draw_area_grid_size;
-    GLPrimitive draw_area_bg;
+    ShapePrimitive draw_area_bg;
 
     VertexBufferPtr score_vertex{{}, {}};
     std::pair<glm::vec2, glm::vec2> score_vertex_bbox;
 
     ShaderPtr shape_shader{{}, {}};
     std::vector<Shape> shape_set;
-    std::array<Shape*, NUM_SHAPES> shape;
+    std::array<Shape *, NUM_SHAPES> shape;
     std::array<size_t, NUM_SHAPES> shape_dst;
     std::array<bool, NUM_SHAPES> shape_done;
     std::optional<size_t> selected_shape;
@@ -116,12 +115,13 @@ struct AppState {
 void update_scale(AppState &as) {
     float scale = as.draw_area_grid_size.x * 0.4f;
 
-    for (auto &s: as.shape) {
+    for (auto &s : as.shape) {
         s->set_scale(scale);
     }
 
     as.font.set_target_width(as.draw_area_size.x * TEXT_WIDTH);
-    as.font.set_trans(glm::vec2{as.draw_area_offset.x + as.draw_area_size.x*TEXT_X, as.draw_area_offset.y + as.draw_area_size.y*TEXT_Y});
+    as.font.set_trans(glm::vec2{as.draw_area_offset.x + as.draw_area_size.x * TEXT_X,
+                                as.draw_area_offset.y + as.draw_area_size.y * TEXT_Y});
 }
 
 void init_game(AppState &as) {
@@ -133,7 +133,7 @@ void init_game(AppState &as) {
     std::shuffle(as.shape_set.begin(), as.shape_set.end(), g);
 
     size_t i = 0;
-    for (auto &s: as.shape) {
+    for (auto &s : as.shape) {
         s = &as.shape_set[i];
         as.shape_dst[i] = i;
 
@@ -203,7 +203,8 @@ bool init_font(AppState &as, const std::string &base_path) {
 void update_score_text(AppState &as) {
     auto [vertex, index] = as.font.make_text_vertex(std::to_string(as.score));
     as.score_vertex_bbox = bbox(vertex);
-    as.score_vertex->update_vertex(glm::value_ptr(vertex[0]), sizeof(decltype(vertex)::value_type)*vertex.size(), index);
+    as.score_vertex->update_vertex(
+        glm::value_ptr(vertex[0]), sizeof(decltype(vertex)::value_type) * vertex.size(), index);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -217,7 +218,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
 
     AppState *as = new AppState();
-    
+
     if (!as) {
         LOG("can't alloc memory for AppState");
         return SDL_APP_FAILURE;
@@ -236,13 +237,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES); 
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 
-    if (!SDL_CreateWindowAndRenderer("Shape Game", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
+    if (!SDL_CreateWindowAndRenderer(
+            "Shape Game", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
         LOG("SDL_CreateWindowAndRenderer failed");
         return SDL_APP_FAILURE;
-    }    
+    }
 
     if (!SDL_SetRenderVSync(as->renderer, 1)) {
         LOG("SDL_SetRenderVSync failed");
@@ -261,15 +263,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // pre-allocate all vertex we need
     // number of space needs to be >= MAX_SCORE string
-    as->score_vertex = as->font.make_text("    "); 
+    as->score_vertex = as->font.make_text("    ");
     update_score_text(*as);
 
     as->shape_shader = make_shape_shader();
-        
-    glEnable(GL_BLEND);  
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     as->vao = make_vertex_array();
 
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // background color for drawing area
     // the area size is determined later
@@ -279,6 +280,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->draw_area_bg.color = BG_COLOR;
 
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
+
     init_game(*as);
 
     as->last_tick = SDL_GetTicks();
@@ -304,21 +306,21 @@ bool recalc_draw_area(AppState &as) {
     if (win_w > win_h) {
         as.draw_area_size.y = win_hf;
         as.draw_area_size.x = win_hf * ASPECT_RATIO;
-        as.draw_area_offset.x = (win_wf - as.draw_area_size.x)/2;
+        as.draw_area_offset.x = (win_wf - as.draw_area_size.x) / 2;
         as.draw_area_offset.y = 0;
     } else {
         as.draw_area_size.x = win_wf;
         as.draw_area_size.y = win_wf / ASPECT_RATIO;
         as.draw_area_offset.x = 0;
-        as.draw_area_offset.y = (win_hf - as.draw_area_size.y) /2;
+        as.draw_area_offset.y = (win_hf - as.draw_area_size.y) / 2;
     }
 
-    as.draw_area_grid_size.x = as.draw_area_size.x*1.f / NUM_SHAPES;
+    as.draw_area_grid_size.x = as.draw_area_size.x * 1.f / NUM_SHAPES;
     as.draw_area_grid_size.y = as.draw_area_size.y / 4.f;
 
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
-   
+
     as.shape_shader->use();
     glUniformMatrix4fv(as.shape_shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
 
@@ -331,20 +333,28 @@ bool recalc_draw_area(AppState &as) {
 void update_background(const AppState &as) {
     glm::vec2 v[4];
 
-    v[0] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y};
-    v[1] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y};
-    v[2] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y + as.draw_area_size.y};
-    v[3] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y + as.draw_area_size.y};
-  
+    const auto &offset = as.draw_area_offset;
+    const auto &size = as.draw_area_size;
+
+    v[0] = glm::vec2{offset.x, offset.y};
+    v[1] = glm::vec2{offset.x + size.x, offset.y};
+    v[2] = glm::vec2{offset.x + size.x, offset.y + size.y};
+    v[3] = glm::vec2{offset.x, offset.y + size.y};
+
     as.draw_area_bg.vertex_buffer->update_vertex(glm::value_ptr(v[0]), sizeof(v));
 }
 
 glm::vec2 shape_index_to_src_pos(const AppState &as, size_t idx) {
-    return glm::vec2{as.draw_area_offset.x + static_cast<float>(idx+1)*as.draw_area_grid_size.x - as.draw_area_grid_size.x*0.5, as.draw_area_offset.y + as.draw_area_grid_size.y};
+    const auto &offset = as.draw_area_offset;
+    const auto &grid_size = as.draw_area_grid_size;
+    return glm::vec2{offset.x + static_cast<float>(idx + 1) * grid_size.x - grid_size.x * 0.5, offset.y + grid_size.y};
 }
 
 glm::vec2 shape_index_to_dst_pos(const AppState &as, size_t idx) {
-    return glm::vec2{as.draw_area_offset.x + static_cast<float>(idx+1)*as.draw_area_grid_size.x - as.draw_area_grid_size.x*0.5, as.draw_area_offset.y + as.draw_area_grid_size.y*3};
+    const auto &offset = as.draw_area_offset;
+    const auto &grid_size = as.draw_area_grid_size;
+    return glm::vec2{offset.x + static_cast<float>(idx + 1) * grid_size.x - grid_size.x * 0.5,
+                     offset.y + grid_size.y * 3};
 }
 
 std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
@@ -353,16 +363,16 @@ std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
 
     std::optional<size_t> selected_shape;
 
-    for (size_t i=0; i < NUM_SHAPES; i++) {
+    for (size_t i = 0; i < NUM_SHAPES; i++) {
         glm::vec2 pos;
 
         if (dst) {
-            pos = shape_index_to_dst_pos(as, i); 
+            pos = shape_index_to_dst_pos(as, i);
         } else {
             if (as.shape_done[i]) {
                 continue;
             }
-            pos = shape_index_to_src_pos(as, i); 
+            pos = shape_index_to_src_pos(as, i);
         }
 
         const auto &s = *as.shape[i];
@@ -380,10 +390,11 @@ std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
-    AppState &as = *static_cast<AppState*>(appstate);
+    AppState &as = *static_cast<AppState *>(appstate);
 
     switch (event->type) {
-        case SDL_EVENT_QUIT: return SDL_APP_SUCCESS;
+        case SDL_EVENT_QUIT:
+            return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
 #ifndef __EMSCRIPTEN__
             if (event->key.key == SDLK_ESCAPE) {
@@ -441,7 +452,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
             break;
     }
-    
+
     return SDL_APP_CONTINUE;
 }
 
@@ -450,7 +461,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     (void)result;
 
     if (appstate) {
-        AppState &as = *static_cast<AppState*>(appstate);
+        AppState &as = *static_cast<AppState *>(appstate);
         SDL_DestroyRenderer(as.renderer);
         SDL_DestroyWindow(as.window);
 
@@ -467,9 +478,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     }
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate)
-{
-    AppState &as = *static_cast<AppState*>(appstate);
+SDL_AppResult SDL_AppIterate(void *appstate) {
+    AppState &as = *static_cast<AppState *>(appstate);
 
     float dt = static_cast<float>(SDL_GetTicksNS() - as.last_tick) * 1e-9f;
     as.last_tick = SDL_GetTicksNS();
@@ -498,18 +508,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     as.vao->use();
 
-    float cx=0, cy=0;
+    float cx = 0, cy = 0;
     SDL_GetMouseState(&cx, &cy);
 
     as.draw_area_bg.draw(as.shape_shader);
 
-    for (size_t i=0; i < as.shape.size(); i++) {
+    for (size_t i = 0; i < as.shape.size(); i++) {
         auto &s = *as.shape[i];
         size_t dst_idx = as.shape_dst[i];
 
         if (as.shape_done[i]) {
             s.set_trans(shape_index_to_dst_pos(as, dst_idx));
-           
+
             s.fill.draw(as.shape_shader);
             s.line.draw(as.shape_shader);
         } else {
@@ -521,8 +531,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
             float theta = s.line.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
             if (theta < 0) {
-                theta = static_cast<float>(2*M_PI);
-            } else if (theta > 2*M_PI) {
+                theta = static_cast<float>(2 * M_PI);
+            } else if (theta > 2 * M_PI) {
                 theta = 0.f;
             }
 
@@ -543,8 +553,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     if (as.score > 0) {
-        glm::vec2 text_center = (as.score_vertex_bbox.first + as.score_vertex_bbox.second)*0.5f * as.font.distance_scale;
-        glm::vec2 center{as.draw_area_offset.x + 0.5*as.draw_area_size.x - text_center.x, as.draw_area_offset.y + 0.5f*as.draw_area_size.y - text_center.y};
+        glm::vec2 text_center =
+            (as.score_vertex_bbox.first + as.score_vertex_bbox.second) * 0.5f * as.font.distance_scale;
+        glm::vec2 center{as.draw_area_offset.x + 0.5 * as.draw_area_size.x - text_center.x,
+                         as.draw_area_offset.y + 0.5f * as.draw_area_size.y - text_center.y};
 
         as.font.set_trans(center);
         draw_vertex_buffer(as.font.shader, as.score_vertex, as.font.tex);

@@ -1,23 +1,23 @@
 #pragma once
 
-#include <vector>
-#include <map>
-#include <string>
+#include <SDL3/SDL_opengles2.h>
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
-#include <SDL3/SDL_opengles2.h>
+#include <map>
+#include <string>
+#include <vector>
 
 #include "gl_helper.hpp"
 
 // Wrapper for GL_TRIANGLES
-struct GLPrimitive {
+struct ShapePrimitive {
     VertexBufferPtr vertex_buffer{{}, {}};
 
     glm::vec4 color{};
     glm::vec2 trans{};
     float scale = 1.0f;
-    float theta = 0.0f; // rotation in radians
+    float theta = 0.0f;  // rotation in radians
 
     void draw(const ShaderPtr &shader);
 };
@@ -26,9 +26,9 @@ struct Shape {
     float radius = 1.0f;
     float rotation_direction = 1.f;
 
-    GLPrimitive line;
-    GLPrimitive line_highlight;
-    GLPrimitive fill;
+    ShapePrimitive line;
+    ShapePrimitive line_highlight;
+    ShapePrimitive fill;
 
     void set_trans(const glm::vec2 &trans);
     void set_scale(float scale);
@@ -49,6 +49,13 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius);
 VertexIndex make_fill(const std::vector<glm::vec2> &vert);
 VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness);
-Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
-Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);
+Shape make_shape(const std::vector<glm::vec2> &vert,
+                 float line_thickness,
+                 const glm::vec4 &line_color,
+                 const glm::vec4 &fill_color);
+Shape make_shape_polygon(int sides,
+                         const std::vector<float> &radius,
+                         float line_thickness,
+                         const glm::vec4 &line_color,
+                         const glm::vec4 &fill_color);
 Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);

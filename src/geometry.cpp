@@ -1,9 +1,10 @@
 #include "geometry.hpp"
-#include "gl_helper.hpp"
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <glm/gtc/matrix_transform.hpp>
 #include <random>
+
+#include "gl_helper.hpp"
 
 namespace {
 const char *vertex_shader = R"(#version 300 es
@@ -36,16 +37,16 @@ void main() {
     o_color = v_color;
 })";
 
-} // namespace 
-  // :
+}  // namespace
+   // :
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius) {
     std::vector<glm::vec2> vert;
 
-    for (int i=0; i < sides; i++) {
-        float theta = static_cast<float>(i * 2*M_PI / sides);
+    for (int i = 0; i < sides; i++) {
+        float theta = static_cast<float>(i * 2 * M_PI / sides);
         float r = radius[static_cast<size_t>(i) % radius.size()];
-        float x = r*std::cos(theta);
-        float y = r*std::sin(theta);
+        float x = r * std::cos(theta);
+        float y = r * std::sin(theta);
 
         vert.push_back(glm::vec2{x, y});
     }
@@ -58,9 +59,9 @@ VertexIndex make_fill(const std::vector<glm::vec2> &vert) {
     std::vector<uint32_t> fill_idx;
 
     fill_vert = vert;
-    fill_vert.push_back(glm::vec2{0.0f, 0.0f}); // cener of shape
+    fill_vert.push_back(glm::vec2{0.0f, 0.0f});  // cener of shape
 
-    for (size_t i=0; i < vert.size(); i++) {
+    for (size_t i = 0; i < vert.size(); i++) {
         uint32_t j = static_cast<uint32_t>((i + 1) % vert.size());
 
         fill_idx.push_back(static_cast<uint32_t>(i));
@@ -77,7 +78,7 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     std::vector<uint32_t> tri_idx;
     std::vector<glm::vec2> inner, outer;
 
-    for (size_t i=0; i < vert.size(); i++) {
+    for (size_t i = 0; i < vert.size(); i++) {
         size_t j = (i + 1) % vert.size();
 
         glm::vec2 v = vert[j] - vert[i];
@@ -95,26 +96,26 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
         tri_idx.push_back(idx + 2);
         tri_idx.push_back(idx + 3);
 
-        tri_pts.push_back(vert[i] + n*thickness*0.5f);
-        tri_pts.push_back(vert[j] + n*thickness*0.5f);
-        tri_pts.push_back(vert[j] - n*thickness*0.5f);
-        tri_pts.push_back(vert[i] - n*thickness*0.5f);
+        tri_pts.push_back(vert[i] + n * thickness * 0.5f);
+        tri_pts.push_back(vert[j] + n * thickness * 0.5f);
+        tri_pts.push_back(vert[j] - n * thickness * 0.5f);
+        tri_pts.push_back(vert[i] - n * thickness * 0.5f);
 
-        outer.push_back(vert[i] + n*thickness*0.5f);
-        outer.push_back(vert[j] + n*thickness*0.5f);
-        inner.push_back(vert[j] - n*thickness*0.5f);
-        inner.push_back(vert[i] - n*thickness*0.5f);
+        outer.push_back(vert[i] + n * thickness * 0.5f);
+        outer.push_back(vert[j] + n * thickness * 0.5f);
+        inner.push_back(vert[j] - n * thickness * 0.5f);
+        inner.push_back(vert[i] - n * thickness * 0.5f);
     }
 
-     // miter
-    for (size_t i=0; i < vert.size(); i++) {
+    // miter
+    for (size_t i = 0; i < vert.size(); i++) {
         size_t j = (i + 1) % vert.size();
 
-        for (const auto &pts: {inner, outer}) {
-            glm::vec2 p0 = pts[i*2];
-            glm::vec2 p1 = pts[i*2 + 1];
-            glm::vec2 p2 = pts[j*2];
-            glm::vec2 p3 = pts[j*2 + 1];
+        for (const auto &pts : {inner, outer}) {
+            glm::vec2 p0 = pts[i * 2];
+            glm::vec2 p1 = pts[i * 2 + 1];
+            glm::vec2 p2 = pts[j * 2];
+            glm::vec2 p3 = pts[j * 2 + 1];
 
             glm::vec2 v0 = p1 - p0;
             glm::vec2 v1 = p3 - p2;
@@ -124,14 +125,14 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
             // A = [v0 | -v1]
             // b = p2 - p0
             // use Cramer's rule
-           
+
             glm::vec2 b = p2 - p0;
 
-            double det = v0[0]*(-v1[1]) - (-v1[0]*v0[1]);
-            double c0 =  b[0]*(-v1[1]) - (-v1[0]*b[1]);
+            double det = v0[0] * (-v1[1]) - (-v1[0] * v0[1]);
+            double c0 = b[0] * (-v1[1]) - (-v1[0] * b[1]);
             float t0 = static_cast<float>(c0 / det);
 
-            glm::vec2 pp = p0 + v0*t0;
+            glm::vec2 pp = p0 + v0 * t0;
 
             uint32_t idx = static_cast<uint32_t>(tri_pts.size());
 
@@ -152,33 +153,40 @@ VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness) {
     return {tri_pts, tri_idx};
 }
 
-Shape make_shape(const std::vector<glm::vec2> &vert, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+Shape make_shape(const std::vector<glm::vec2> &vert,
+                 float line_thickness,
+                 const glm::vec4 &line_color,
+                 const glm::vec4 &fill_color) {
     Shape shape;
     {
-    auto[vertex, index] = make_fill(vert);
-    shape.fill.vertex_buffer = make_vertex_buffer(vertex, index);
-    shape.fill.color = fill_color;
+        auto [vertex, index] = make_fill(vert);
+        shape.fill.vertex_buffer = make_vertex_buffer(vertex, index);
+        shape.fill.color = fill_color;
     }
 
     {
-    auto[vertex, index] = make_line(vert, line_thickness);
-    shape.line.vertex_buffer = make_vertex_buffer(vertex, index);
-    shape.line.color = line_color;
+        auto [vertex, index] = make_line(vert, line_thickness);
+        shape.line.vertex_buffer = make_vertex_buffer(vertex, index);
+        shape.line.color = line_color;
     }
 
     {
-    auto[vertex, index] = make_line(vert, line_thickness*2);
-    shape.line_highlight.vertex_buffer = make_vertex_buffer(vertex, index);
-    shape.line_highlight.color = line_color;
+        auto [vertex, index] = make_line(vert, line_thickness * 2);
+        shape.line_highlight.vertex_buffer = make_vertex_buffer(vertex, index);
+        shape.line_highlight.color = line_color;
     }
 
     return shape;
 }
 
-Shape make_shape_polygon(int sides, const std::vector<float> &radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
+Shape make_shape_polygon(int sides,
+                         const std::vector<float> &radius,
+                         float line_thickness,
+                         const glm::vec4 &line_color,
+                         const glm::vec4 &fill_color) {
     std::vector<glm::vec2> vert = make_polygon(sides, radius);
 
-    Shape s= make_shape(vert, line_thickness, line_color, fill_color);
+    Shape s = make_shape(vert, line_thickness, line_color, fill_color);
     s.radius = *std::max_element(radius.begin(), radius.end());
 
     return s;
@@ -192,10 +200,10 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     std::vector<glm::vec2> vert;
 
     int sides = 36;
-    for (int i=0; i < sides; i++) {
-        float theta = static_cast<float>(i * 2*M_PI / sides);
-        float x = radius*std::cos(theta);
-        float y = radius*std::sin(theta)*0.5f;
+    for (int i = 0; i < sides; i++) {
+        float theta = static_cast<float>(i * 2 * M_PI / sides);
+        float x = radius * std::cos(theta);
+        float y = radius * std::sin(theta) * 0.5f;
 
         vert.push_back(glm::vec2{x, y});
     }
@@ -203,8 +211,7 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     return make_shape(vert, line_thickness, line_color, fill_color);
 }
 
-  
-void GLPrimitive::draw(const ShaderPtr &shader) {
+void ShapePrimitive::draw(const ShaderPtr &shader) {
     shader->use();
 
     glUniform1f(shader->get_loc("scale"), scale);
@@ -214,16 +221,16 @@ void GLPrimitive::draw(const ShaderPtr &shader) {
 
     draw_vertex_buffer(shader, vertex_buffer);
 }
-  
+
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
-    constexpr float line_thickness = 0.1f; // normalize
+    constexpr float line_thickness = 0.1f;  // normalize
 
     // randomly color for each shape
     std::random_device rd;
     std::mt19937 g(rd());
 
     std::vector<glm::vec4> color;
-    for (auto [_, col]: palette) {
+    for (auto [_, col] : palette) {
         color.push_back(col);
     }
     std::shuffle(color.begin(), color.end(), g);
@@ -236,7 +243,7 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
         return color[idx];
     };
 
-    for (int sides=3; sides <= 9; sides++) {
+    for (int sides = 3; sides <= 9; sides++) {
         Shape s = make_shape_polygon(sides, {1.f}, line_thickness, line_color, next_color());
         ret.push_back(std::move(s));
     }
@@ -247,8 +254,8 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     Shape oval = make_oval(1.f, line_thickness, line_color, next_color());
     ret.push_back(std::move(oval));
 
-    for (int i=0; i < 4; i++) {
-        Shape star = make_shape_polygon(8 + i*2, {1.0f, 0.5f}, line_thickness, line_color, next_color());
+    for (int i = 0; i < 4; i++) {
+        Shape star = make_shape_polygon(8 + i * 2, {1.0f, 0.5f}, line_thickness, line_color, next_color());
         ret.push_back(std::move(star));
     }
 
@@ -258,9 +265,7 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     return ret;
 }
 
-ShaderPtr make_shape_shader() {
-    return make_shader(vertex_shader, fragment_shader);
-}
+ShaderPtr make_shape_shader() { return make_shader(vertex_shader, fragment_shader); }
 
 void Shape::set_trans(const glm::vec2 &trans) {
     line.trans = trans;

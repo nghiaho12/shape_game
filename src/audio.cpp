@@ -1,9 +1,12 @@
 #include "audio.hpp"
-#include "log.hpp"
-#include "stb_vorbis.hpp"
+
 #include <SDL3/SDL_audio.h>
+
 #include <cstdint>
 #include <cstdlib>
+
+#include "log.hpp"
+#include "stb_vorbis.hpp"
 
 void Audio::play() {
     if (stream) {
@@ -27,7 +30,7 @@ bool load_stream(SDL_AudioDeviceID audio_device, Audio &audio, float volume) {
         return false;
     }
 
-    if (!SDL_BindAudioStream(audio_device, audio.stream)) { 
+    if (!SDL_BindAudioStream(audio_device, audio.stream)) {
         LOG("Failed to bind stream to device: %s", SDL_GetError());
         return false;
     }
@@ -39,13 +42,13 @@ bool load_stream(SDL_AudioDeviceID audio_device, Audio &audio, float volume) {
     return true;
 }
 
-}
+}  // namespace
 
 std::optional<Audio> load_ogg(SDL_AudioDeviceID audio_device, const char *path, float volume) {
     // NOTE: Can't use fopen on files inside an Android APK.
     // SDL provides IO abstraction for this.
     size_t data_size;
-    uint8_t *data = static_cast<uint8_t*>(SDL_LoadFile(path, &data_size));
+    uint8_t *data = static_cast<uint8_t *>(SDL_LoadFile(path, &data_size));
 
     if (!data) {
         LOG("Failed to open file '%s'.", path);
@@ -55,8 +58,9 @@ std::optional<Audio> load_ogg(SDL_AudioDeviceID audio_device, const char *path, 
     Audio ret;
 
     short *output;
-    int samples = stb_vorbis_decode_memory(data, static_cast<int>(data_size), &ret.spec.channels, &ret.spec.freq, &output);
-  
+    int samples =
+        stb_vorbis_decode_memory(data, static_cast<int>(data_size), &ret.spec.channels, &ret.spec.freq, &output);
+
     ret.data.resize(static_cast<size_t>(samples * ret.spec.channels) * sizeof(short));
     memcpy(ret.data.data(), output, ret.data.size());
 
@@ -92,4 +96,3 @@ std::optional<Audio> load_wav(SDL_AudioDeviceID audio_device, const char *path, 
 
     return ret;
 }
-

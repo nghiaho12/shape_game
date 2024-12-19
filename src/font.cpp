@@ -1,9 +1,11 @@
+#include "font.hpp"
+
 #include <SDL3/SDL_surface.h>
+
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
 #include <sstream>
 
-#include "font.hpp"
 #include "gl_helper.hpp"
 #include "log.hpp"
 
@@ -23,7 +25,7 @@ void main() {
     gl_Position = projection_matrix * vec4(position*scale + trans, 0.0, 1.0);
     texCoord = atlas_tex_coord;
 })";
-    
+
 const char *font_fragment_shader = R"(#version 300 es
 precision mediump float;
 
@@ -69,7 +71,7 @@ void main() {
         color = mix(bg_color, fg_color, opacity);
     }
 })";
-}
+}  // namespace
 
 bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt) {
     shader = make_shader(font_vertex_shader, font_fragment_shader);
@@ -90,7 +92,7 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
     letter = make_vertex_buffer(empty_vert, index);
 
     size_t data_size;
-    char *data = static_cast<char*>(SDL_LoadFile(atlas_txt.c_str(), &data_size));
+    char *data = static_cast<char *>(SDL_LoadFile(atlas_txt.c_str(), &data_size));
 
     if (!data) {
         LOG("Failed to open file '%s'.", atlas_txt.c_str());
@@ -101,15 +103,20 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
     std::stringstream ss(str);
 
     std::string label;
-    ss >> label; assert(label == "distance_range");
+    ss >> label;
+    assert(label == "distance_range");
     ss >> distance_range;
-    ss >> label; assert(label == "em_size");
+    ss >> label;
+    assert(label == "em_size");
     ss >> em_size;
-    ss >> label; assert(label == "grid_width");
+    ss >> label;
+    assert(label == "grid_width");
     ss >> grid_width;
-    ss >> label; assert(label == "grid_height");
+    ss >> label;
+    assert(label == "grid_height");
     ss >> grid_height;
-    ss >> label; assert(label == "unicode");
+    ss >> label;
+    assert(label == "unicode");
 
     while (true) {
         int unicode;
@@ -134,8 +141,8 @@ bool FontAtlas::load(const std::string &atlas_path, const std::string &atlas_txt
     }
 
     shader->use();
-    glUniform1i(shader->get_loc("msdf"), 0); 
-    glUniform1f(shader->get_loc("distance_range"), static_cast<float>(distance_range)); 
+    glUniform1i(shader->get_loc("msdf"), 0);
+    glUniform1f(shader->get_loc("distance_range"), static_cast<float>(distance_range));
     glUniform1f(shader->get_loc("scale"), 1.0);
     glUniform2fv(shader->get_loc("trans"), 1, &glm::vec2(0)[0]);
 
@@ -147,8 +154,8 @@ std::pair<glm::vec2, glm::vec2> FontAtlas::get_char_uv(char ch) {
 
     float w = static_cast<float>(tex->width);
     float h = static_cast<float>(tex->height);
-    glm::vec2 start{g.atlas_left/w, 1 - g.atlas_bottom/h};
-    glm::vec2 end{g.atlas_right/w, 1  - g.atlas_top/h};
+    glm::vec2 start{g.atlas_left / w, 1 - g.atlas_bottom / h};
+    glm::vec2 end{g.atlas_right / w, 1 - g.atlas_top / h};
 
     return {start, end};
 }
@@ -167,10 +174,10 @@ std::vector<glm::vec4> FontAtlas::make_letter(float x, float y, char ch) {
     y += yoff;
 
     // pos + uv
-    return std::vector<glm::vec4> {
+    return std::vector<glm::vec4>{
         {x, y, start.x, start.y},
-        {x + w, y,  end.x, start.y},
-        {x + w, y - h,  end.x, end.y},
+        {x + w, y, end.x, start.y},
+        {x + w, y - h, end.x, end.y},
         {x, y - h, start.x, end.y},
     };
 }
@@ -183,12 +190,12 @@ std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> FontAtlas::make_text_ve
 
     uint32_t vertex_count = 0;
 
-    for (char ch: str) {
+    for (char ch : str) {
         auto v = make_letter(xpos, 0, ch);
         vertex_uv.insert(vertex_uv.end(), v.begin(), v.end());
 
         const Glyph &g = glyph[static_cast<int>(ch)];
-        xpos += g.advance*em_size;
+        xpos += g.advance * em_size;
 
         // quad
         std::vector<uint32_t> idx{0, 1, 2, 0, 2, 3};
@@ -210,17 +217,17 @@ VertexBufferPtr FontAtlas::make_text(const std::string &str) {
 
 void FontAtlas::draw_letter(float x, float y, char ch) {
     std::vector<glm::vec4> vert = make_letter(x, y, ch);
-    letter->update_vertex(glm::value_ptr(vert[0]), sizeof(glm::vec4)*vert.size());
+    letter->update_vertex(glm::value_ptr(vert[0]), sizeof(glm::vec4) * vert.size());
     draw_vertex_buffer(shader, letter, tex);
 }
 
 void FontAtlas::draw_string(float x, float y, const std::string &str) {
     float xpos = x;
 
-    for (char ch: str) {
+    for (char ch : str) {
         draw_letter(xpos, y, ch);
         const Glyph &g = glyph[static_cast<int>(ch)];
-        xpos += g.advance*em_size*distance_scale;
+        xpos += g.advance * em_size * distance_scale;
     }
 }
 
