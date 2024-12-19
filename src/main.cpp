@@ -11,6 +11,7 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp> 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <vector>
 #include <cmath>
@@ -87,7 +88,6 @@ struct AppState {
     std::map<AudioEnum, Audio> audio;
 
     FontAtlas font;
-    GLPrimitive letter;
     VertexArrayPtr vao{{}, {}};
 
     int score = 0;
@@ -97,8 +97,7 @@ struct AppState {
     glm::vec2 draw_area_offset;
     glm::vec2 draw_area_size;
     glm::vec2 draw_area_grid_size;
-
-    GLPrimitive bg;
+    GLPrimitive draw_area_bg;
 
     VertexBufferPtr score_vertex{{}, {}};
     std::pair<glm::vec2, glm::vec2> score_vertex_bbox;
@@ -204,7 +203,7 @@ bool init_font(AppState &as, const std::string &base_path) {
 void update_score_text(AppState &as) {
     auto [vertex, index] = as.font.make_text_vertex(std::to_string(as.score));
     as.score_vertex_bbox = bbox(vertex);
-    as.score_vertex->update_vertex(vertex, index);
+    as.score_vertex->update_vertex(glm::value_ptr(vertex[0]), sizeof(decltype(vertex)::value_type)*vertex.size(), index);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -276,8 +275,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // the area size is determined later
     std::vector<glm::vec2> empty(4);
     std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
-    as->bg.vertex_buffer = make_vertex_buffer(empty, index);
-    as->bg.color = BG_COLOR;
+    as->draw_area_bg.vertex_buffer = make_vertex_buffer(empty, index);
+    as->draw_area_bg.color = BG_COLOR;
 
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
     init_game(*as);
@@ -330,14 +329,14 @@ bool recalc_draw_area(AppState &as) {
 }
 
 void update_background(const AppState &as) {
-    std::vector<glm::vec2> bg(4);
+    glm::vec2 v[4];
 
-    bg[0] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y};
-    bg[1] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y};
-    bg[2] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y + as.draw_area_size.y};
-    bg[3] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y + as.draw_area_size.y};
+    v[0] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y};
+    v[1] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y};
+    v[2] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y + as.draw_area_size.y};
+    v[3] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y + as.draw_area_size.y};
   
-    as.bg.vertex_buffer->update_vertex(bg);
+    as.draw_area_bg.vertex_buffer->update_vertex(glm::value_ptr(v[0]), sizeof(v));
 }
 
 glm::vec2 shape_index_to_src_pos(const AppState &as, size_t idx) {
@@ -484,7 +483,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GL_MakeCurrent(as.window, as.gl_ctx);
 #endif
 
-    glUseProgram(as.shape_shader->program);
+    as.shape_shader->use();
 
     if (!as.init) {
         recalc_draw_area(as);
@@ -502,7 +501,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     float cx=0, cy=0;
     SDL_GetMouseState(&cx, &cy);
 
-    as.bg.draw(as.shape_shader);
+    as.draw_area_bg.draw(as.shape_shader);
 
     for (size_t i=0; i < as.shape.size(); i++) {
         auto &s = *as.shape[i];
@@ -548,7 +547,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         glm::vec2 center{as.draw_area_offset.x + 0.5*as.draw_area_size.x - text_center.x, as.draw_area_offset.y + 0.5f*as.draw_area_size.y - text_center.y};
 
         as.font.set_trans(center);
-        draw_with_texture(as.font.shader, as.font.tex, as.score_vertex);
+        draw_vertex_buffer(as.font.shader, as.score_vertex, as.font.tex);
     }
 
     SDL_GL_SwapWindow(as.window);

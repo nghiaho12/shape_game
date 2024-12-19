@@ -1,3 +1,4 @@
+#include <glm/gtc/type_ptr.hpp>
 #define GL_GLEXT_PROTOTYPES
 #include "gl_helper.hpp"
 #include "log.hpp"
@@ -65,6 +66,7 @@ void VertexArray::use() {
 
 VertexArrayPtr make_vertex_array() {
     auto cleanup = [](VertexArray *v) {
+        LOG("deleting vertex array: %d", v->vao);
         glDeleteVertexArraysOES(1, &v->vao);
     };
 
@@ -123,7 +125,7 @@ TexturePtr make_texture(const std::string &bmp_path) {
     }
 
     auto cleanup = [](Texture *t) {
-        LOG("deleting texture: %d", t->id);
+        LOG("deleting texture: %d(%dx%d)", t->id, t->width, t->height);
         glDeleteTextures(1, &t->id);
     };
                    
@@ -151,16 +153,16 @@ void Texture::use() const {
 }
 
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec2> &vertex, const std::vector<uint32_t> &index) {
-    return make_vertex_buffer(&vertex[0].x, static_cast<int>(2*vertex.size()), index);
+    return make_vertex_buffer(glm::value_ptr(vertex[0]), sizeof(glm::vec2)*vertex.size(), index);
 }
 
 VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec4> &vertex, const std::vector<uint32_t> &index) {
-    return make_vertex_buffer(&vertex[0].x, static_cast<int>(4*vertex.size()), index);
+    return make_vertex_buffer(glm::value_ptr(vertex[0]), sizeof(glm::vec4)*vertex.size(), index);
 }
 
-VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const std::vector<uint32_t> &index) {
+VertexBufferPtr make_vertex_buffer(const float *vertex, size_t vertex_bytes, const std::vector<uint32_t> &index) {
     auto cleanup = [](VertexBuffer *v) {
-        LOG("deleting vertex and index buffer: %d %d", v->vertex, v->index);
+        LOG("deleting vertex and index buffer: %d(%ld bytes) %d(%ld count)", v->vertex, v->vertex_bytes, v->index, v->index_count);
         glDeleteBuffers(1, &v->vertex);
         glDeleteBuffers(1, &v->index);
     };
@@ -169,13 +171,13 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, int vertex_count, const 
 
     glGenBuffers(1, &v->vertex);
     glBindBuffer(GL_ARRAY_BUFFER, v->vertex);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(float)*static_cast<uint32_t>(vertex_count)), vertex, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertex_bytes), vertex, GL_DYNAMIC_DRAW);
+    v->vertex_bytes = vertex_bytes;
 
     glGenBuffers(1, &v->index);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v->index);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint32_t)*index.size()), index.data(), GL_STATIC_DRAW);
-
-    v->index_count = static_cast<int>(index.size());
+    v->index_count = index.size();
 
     return v;
 }
@@ -185,37 +187,37 @@ void VertexBuffer::use() const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
 }
 
-void VertexBuffer::update_vertex(const std::vector<glm::vec2> &v) const {
+void VertexBuffer::update_vertex(const float *v, size_t v_bytes, const std::vector<uint32_t> &optional_idx) {
     glBindBuffer(GL_ARRAY_BUFFER, vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec2)*v.size()), v.data());
-}
-
-void VertexBuffer::update_vertex(const std::vector<glm::vec4> &v, const std::vector<uint32_t> &optional_idx) {
-    glBindBuffer(GL_ARRAY_BUFFER, vertex);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(glm::vec4)*v.size()), v.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(v_bytes), v);
 
     if (!optional_idx.empty()) {
         glBindBuffer(GL_ARRAY_BUFFER, index);
         glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(optional_idx.size()), optional_idx.data());
-        index_count = static_cast<int>(optional_idx.size());
+        index_count = optional_idx.size();
     }
 }
 
-void draw_with_texture(const ShaderPtr &shader, const TexturePtr &tex, const VertexBufferPtr &v) {
+void draw_vertex_buffer(const ShaderPtr &shader, const VertexBufferPtr &v, const TexturePtr &optional_tex) {
     shader->use();
-    tex->use();
     v->use();
 
     glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
 
-    int stride = sizeof(float) * 4;
-    int uv_offset = sizeof(float) * 2;
+    int stride = 0;
+
+    if (optional_tex) {
+        optional_tex->use();
+        glEnableVertexAttribArray(1);
+
+        stride = sizeof(float) * 4;
+        int uv_offset = sizeof(float) * 2;
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(uv_offset));
+    }
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(uv_offset));
 
-    glDrawElements(GL_TRIANGLES, v->index_count, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(v->index_count), GL_UNSIGNED_INT, 0);
 }
 
 std::pair<glm::vec2, glm::vec2> bbox(const std::vector<glm::vec4> &vertex) {

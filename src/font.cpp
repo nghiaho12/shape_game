@@ -1,4 +1,5 @@
 #include <SDL3/SDL_surface.h>
+#include <glm/gtc/type_ptr.hpp>
 #include <memory>
 #include <sstream>
 
@@ -209,8 +210,8 @@ VertexBufferPtr FontAtlas::make_text(const std::string &str) {
 
 void FontAtlas::draw_letter(float x, float y, char ch) {
     std::vector<glm::vec4> vert = make_letter(x, y, ch);
-    letter->update_vertex(vert);
-    draw_with_texture(shader, tex, letter);
+    letter->update_vertex(glm::value_ptr(vert[0]), sizeof(glm::vec4)*vert.size());
+    draw_vertex_buffer(shader, letter, tex);
 }
 
 void FontAtlas::draw_string(float x, float y, const std::string &str) {
