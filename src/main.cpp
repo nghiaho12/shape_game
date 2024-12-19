@@ -33,7 +33,7 @@
 #include "gl_helper.hpp"
 
 constexpr int NUM_SHAPES = 5;
-constexpr int MAX_SCORE = 10; // score will wrap
+constexpr int MAX_SCORE = 100; // score will wrap
 constexpr float ASPECT_RATIO = 4.f/3.f;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};

@@ -42,8 +42,8 @@ struct VertexIndex {
 
 ShaderPtr make_shape_shader();
 
-// Create all possible shapes for the game.
-// All shapes are normalized to radius of 1.0 unit and scaled according to screen size.
+// Create all possible shapes for the game
+// All shapes are normalized to radius of 1.0 unit
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette);
 
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius);

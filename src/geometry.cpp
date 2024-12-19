@@ -3,6 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <random>
 
 namespace {
 const char *vertex_shader = R"(#version 300 es
@@ -220,19 +221,24 @@ void GLPrimitive::draw(const ShaderPtr &shader) {
 }
   
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
-    // All shapes have a normalized radius of 1.0 unit
-    
     constexpr float line_thickness = 0.1f; // normalize
+
+    // randomly color for each shape
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    std::vector<glm::vec4> color;
+    for (auto [_, col]: palette) {
+        color.push_back(col);
+    }
+    std::shuffle(color.begin(), color.end(), g);
 
     std::vector<Shape> ret;
 
     size_t idx = 0;
     auto next_color = [&]() -> glm::vec4 {
-        auto it = palette.begin();
-        std::advance(it, idx);
         idx = (idx + 1) % palette.size();
-
-        return it->second;
+        return color[idx];
     };
 
     for (int sides=3; sides <= 9; sides++) {
