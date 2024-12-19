@@ -2,14 +2,12 @@ Simple shape matching game for kids written using SDL3 and OpenGL ES.
 It runs on Linux, Android and the web.
 
 # Prerequisite
-Install git-lfs eg.
+This repo uses git LFS for the assets. Installing it before cloning.
 ```
 sudo apt install git-lfs
 ```
 
-You should see a shape_game/assets folder with some sound files.
-
-Install Docker if you want to build for Android or web eg.
+Install Docker if you want to build for Android or web.
 ```
 sudo apt install docker-ce
 ```
@@ -26,7 +24,7 @@ cd ..
 
 Hit ESC to quit.
 
-# WebAsembly 
+# Web
 ```
 docker build -f Dockerfile.wasm -t shape_game_wasm .
 docker run --rm --network=host shape_game_wasm
@@ -49,4 +47,7 @@ Sound assets
 - https://opengameart.org/content/well-done
 
 Ogg Vorbis decoder
- - https://github.com/nothings/stb
+- https://github.com/nothings/stb
+
+SDF font
+- https://github.com/Chlumsky/msdfgen

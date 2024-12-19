@@ -9,6 +9,14 @@
 
 // Light wrapper around common OpenGL types.
 
+struct VertexArray {
+    GLuint vao;
+    void use();
+};
+
+using VertexArrayPtr = std::unique_ptr<VertexArray, void(*)(VertexArray*)>;
+VertexArrayPtr make_vertex_array();
+
 struct Shader {
     GLuint program = 0;
     GLuint vertex = 0;

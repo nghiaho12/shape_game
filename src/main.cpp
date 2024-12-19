@@ -88,20 +88,18 @@ struct AppState {
 
     FontAtlas font;
     GLPrimitive letter;
-    GLuint vao = 0;
+    VertexArrayPtr vao{{}, {}};
 
     int score = 0;
     bool init = false;
 
     // drawing area within the window
-    float xoff = 0.0f;
-    float yoff = 0.0f;
-    float w = 0.f;
-    float h = 0.f;     
-    float xdiv = 0.f;
-    float ydiv = 0.f;
+    glm::vec2 draw_area_offset;
+    glm::vec2 draw_area_size;
+    glm::vec2 draw_area_grid_size;
 
     GLPrimitive bg;
+
     VertexBufferPtr score_vertex{{}, {}};
     std::pair<glm::vec2, glm::vec2> score_vertex_bbox;
 
@@ -117,14 +115,14 @@ struct AppState {
 };
 
 void update_scale(AppState &as) {
-    float scale = as.xdiv * 0.4f;
+    float scale = as.draw_area_grid_size.x * 0.4f;
 
     for (auto &s: as.shape) {
         s->set_scale(scale);
     }
 
-    as.font.set_target_width(as.w * TEXT_WIDTH);
-    as.font.set_trans(glm::vec2{as.xoff + as.w*TEXT_X, as.yoff + as.h*TEXT_Y});
+    as.font.set_target_width(as.draw_area_size.x * TEXT_WIDTH);
+    as.font.set_trans(glm::vec2{as.draw_area_offset.x + as.draw_area_size.x*TEXT_X, as.draw_area_offset.y + as.draw_area_size.y*TEXT_Y});
 }
 
 void init_game(AppState &as) {
@@ -271,8 +269,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         
     glEnable(GL_BLEND);  
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glGenVertexArraysOES(1, &as->vao);
-    glBindVertexArrayOES(as->vao);
+    as->vao = make_vertex_array();
 
 
     // background color for drawing area
@@ -290,7 +287,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     return SDL_APP_CONTINUE;
 }
 
-bool recalc_drawing_area(AppState &as) {
+bool recalc_draw_area(AppState &as) {
     int win_w, win_h;
 
     if (!SDL_GetWindowSize(as.window, &win_w, &win_h)) {
@@ -306,19 +303,19 @@ bool recalc_drawing_area(AppState &as) {
     float win_hf = static_cast<float>(win_h);
 
     if (win_w > win_h) {
-        as.h = win_hf;
-        as.w = win_hf * ASPECT_RATIO;
-        as.xoff = (win_wf - as.w)/2;
-        as.yoff = 0;
+        as.draw_area_size.y = win_hf;
+        as.draw_area_size.x = win_hf * ASPECT_RATIO;
+        as.draw_area_offset.x = (win_wf - as.draw_area_size.x)/2;
+        as.draw_area_offset.y = 0;
     } else {
-        as.w = win_wf;
-        as.h = win_wf / ASPECT_RATIO;
-        as.xoff = 0;
-        as.yoff = (win_hf - as.h) /2;
+        as.draw_area_size.x = win_wf;
+        as.draw_area_size.y = win_wf / ASPECT_RATIO;
+        as.draw_area_offset.x = 0;
+        as.draw_area_offset.y = (win_hf - as.draw_area_size.y) /2;
     }
 
-    as.xdiv = as.w*1.f / NUM_SHAPES;
-    as.ydiv = as.h / 4.f;
+    as.draw_area_grid_size.x = as.draw_area_size.x*1.f / NUM_SHAPES;
+    as.draw_area_grid_size.y = as.draw_area_size.y / 4.f;
 
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
@@ -335,20 +332,20 @@ bool recalc_drawing_area(AppState &as) {
 void update_background(const AppState &as) {
     std::vector<glm::vec2> bg(4);
 
-    bg[0] = glm::vec2{as.xoff, as.yoff};
-    bg[1] = glm::vec2{as.xoff + as.w, as.yoff};
-    bg[2] = glm::vec2{as.xoff + as.w, as.yoff + as.h};
-    bg[3] = glm::vec2{as.xoff, as.yoff + as.h};
+    bg[0] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y};
+    bg[1] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y};
+    bg[2] = glm::vec2{as.draw_area_offset.x + as.draw_area_size.x, as.draw_area_offset.y + as.draw_area_size.y};
+    bg[3] = glm::vec2{as.draw_area_offset.x, as.draw_area_offset.y + as.draw_area_size.y};
   
     as.bg.vertex_buffer->update_vertex(bg);
 }
 
 glm::vec2 shape_index_to_src_pos(const AppState &as, size_t idx) {
-    return glm::vec2{as.xoff + static_cast<float>(idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv};
+    return glm::vec2{as.draw_area_offset.x + static_cast<float>(idx+1)*as.draw_area_grid_size.x - as.draw_area_grid_size.x*0.5, as.draw_area_offset.y + as.draw_area_grid_size.y};
 }
 
 glm::vec2 shape_index_to_dst_pos(const AppState &as, size_t idx) {
-    return glm::vec2{as.xoff + static_cast<float>(idx+1)*as.xdiv - as.xdiv*0.5, as.yoff + as.ydiv*3};
+    return glm::vec2{as.draw_area_offset.x + static_cast<float>(idx+1)*as.draw_area_grid_size.x - as.draw_area_grid_size.x*0.5, as.draw_area_offset.y + as.draw_area_grid_size.y*3};
 }
 
 std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
@@ -398,7 +395,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             break;
 
         case SDL_EVENT_WINDOW_RESIZED:
-            recalc_drawing_area(as);
+            recalc_draw_area(as);
             update_background(as);
             update_scale(as);
             break;
@@ -458,8 +455,6 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
         SDL_DestroyRenderer(as.renderer);
         SDL_DestroyWindow(as.window);
 
-        glDeleteVertexArraysOES(1, &as.vao);
-
         SDL_CloseAudioDevice(as.audio_device);
 
         // TODO: This code causes a crash as of libSDL preview-3.1.6
@@ -492,7 +487,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glUseProgram(as.shape_shader->program);
 
     if (!as.init) {
-        recalc_drawing_area(as);
+        recalc_draw_area(as);
         update_background(as);
         update_scale(as);
         as.init = true;
@@ -502,7 +497,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glBindVertexArrayOES(as.vao);
+    as.vao->use();
 
     float cx=0, cy=0;
     SDL_GetMouseState(&cx, &cy);
@@ -550,7 +545,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     if (as.score > 0) {
         glm::vec2 text_center = (as.score_vertex_bbox.first + as.score_vertex_bbox.second)*0.5f * as.font.distance_scale;
-        glm::vec2 center{as.xoff + 0.5*as.w - text_center.x, as.yoff + 0.5f*as.h - text_center.y};
+        glm::vec2 center{as.draw_area_offset.x + 0.5*as.draw_area_size.x - text_center.x, as.draw_area_offset.y + 0.5f*as.draw_area_size.y - text_center.y};
 
         as.font.set_trans(center);
         draw_with_texture(as.font.shader, as.font.tex, as.score_vertex);

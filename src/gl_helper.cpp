@@ -59,6 +59,21 @@ void enable_gl_debug_callback() {
 #endif
 }
 
+void VertexArray::use() {
+    glBindVertexArrayOES(vao);
+}
+
+VertexArrayPtr make_vertex_array() {
+    auto cleanup = [](VertexArray *v) {
+        glDeleteVertexArraysOES(1, &v->vao);
+    };
+
+    VertexArrayPtr v(new VertexArray, cleanup);
+    glGenVertexArraysOES(1, &v->vao);
+
+    return v;
+}
+
 void Shader::use() const {
     glUseProgram(program);
 }
