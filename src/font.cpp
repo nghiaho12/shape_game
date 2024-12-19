@@ -1,7 +1,6 @@
 #include "font.hpp"
 
 #include <SDL3/SDL_surface.h>
-
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
 #include <sstream>

@@ -1,3 +1,4 @@
+#include <GLES2/gl2.h>
 #include <glm/gtc/type_ptr.hpp>
 #define GL_GLEXT_PROTOTYPES
 #include <SDL3/SDL_opengles2.h>
@@ -199,30 +200,32 @@ void VertexBuffer::update_vertex(const float *v, size_t v_bytes, const std::vect
     glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(v_bytes), v);
 
     if (!optional_idx.empty()) {
-        glBindBuffer(GL_ARRAY_BUFFER, index);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(optional_idx.size()), optional_idx.data());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(optional_idx.size()), optional_idx.data());
         index_count = optional_idx.size();
     }
 }
 
 void draw_vertex_buffer(const ShaderPtr &shader, const VertexBufferPtr &v, const TexturePtr &optional_tex) {
     shader->use();
-    v->use();
-
-    glEnableVertexAttribArray(0);
-
-    int stride = 0;
 
     if (optional_tex) {
         optional_tex->use();
+
+        glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
 
-        stride = sizeof(float) * 4;
+        int stride = sizeof(float) * 4;
         int uv_offset = sizeof(float) * 2;
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void *>(uv_offset));
-    }
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, 0);
+        v->use();
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void *>(uv_offset));
+    } else {
+        glEnableVertexAttribArray(0);
+        v->use();
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    }
 
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(v->index_count), GL_UNSIGNED_INT, 0);
 }
