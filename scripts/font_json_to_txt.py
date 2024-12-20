@@ -7,7 +7,7 @@ Output goes to asset/atlas.txt.
 Example:
 ```
 msdf-atlas-gen-font /usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf -type msdf -fontname ubuntu_mono -uniformcols 10 -imageout atlas.bmp -json atlas.json --pxrange 8
-./font_json_to_txt.py atlas.json > atlas.txt
+./font_json_to_txt.py atlas.json -square4 > atlas.txt
 ```
 """
 
