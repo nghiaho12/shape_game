@@ -1,12 +1,10 @@
 Simple shape matching game for kids written using SDL3 and OpenGL ES.
-It has been tested on Ubuntu 24.04, Android 14 and web (Firefox 130.0).
+It has been tested on Ubuntu 24.04, Android 14 and web (Firefox 130.0, Chromimum 131.0).
 
-You might find some useful code snippets in here for other stuff.
-Here are some
+You might find some code snippets in here useful for other projects, such as
 
-- Signed Distance Field (SDF) Font
-- Drawing polygons with arbitrary line thickness
-- C++ memory managed OpenGL objects
+- Signed Distance Field (SDF) for rendering sharp scaled fonts 
+- Drawing polygons with control over line thickness 
 
 # Install
 ## Prerequisite
