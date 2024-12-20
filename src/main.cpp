@@ -300,12 +300,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // position for the src and dst shape
     float div = NUM_SHAPES * 2;
+    float norm_h = 1.f / ASPECT_RATIO;
+
     for (size_t i=0; i < NUM_SHAPES; i++) {
         as->src_pos[i].x = static_cast<float>(i*2 + 1) / div;
-        as->src_pos[i].y = 1.f/5.f;
+        as->src_pos[i].y = norm_h * 1.f/4.f;
 
         as->dst_pos[i].x = static_cast<float>(i*2 + 1) / div;
-        as->dst_pos[i].y = 3.f/5.f;
+        as->dst_pos[i].y = norm_h * 3.f/4.f;
     }
 
     init_game(*as);
