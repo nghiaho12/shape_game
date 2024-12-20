@@ -15,13 +15,13 @@ precision mediump float;
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec2 atlas_tex_coord;
 
-uniform mat4 projection_matrix;
+uniform mat4 ortho_matrix;
 uniform vec2 trans;
 uniform float scale;
 out vec2 texCoord;
 
 void main() {
-    gl_Position = projection_matrix * vec4(position*scale + trans, 0.0, 1.0);
+    gl_Position = ortho_matrix * vec4(position*scale + trans, 0.0, 1.0);
     texCoord = atlas_tex_coord;
 })";
 

@@ -1,9 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL_opengles2.h>
-
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
+#include <glm/glm.hpp>
 #include <map>
 #include <string>
 #include <vector>
@@ -13,26 +11,32 @@
 // Wrapper for GL_TRIANGLES
 struct ShapePrimitive {
     VertexBufferPtr vertex_buffer{{}, {}};
-
     glm::vec4 color{};
-    glm::vec2 trans{};
-    float scale = 1.0f;
-    float theta = 0.0f;  // rotation in radians
-
-    void draw(const ShaderPtr &shader);
 };
 
 struct Shape {
-    float radius = 1.0f;
+    BBox bbox;
+
     float rotation_direction = 1.f;
 
     ShapePrimitive line;
     ShapePrimitive line_highlight;
     ShapePrimitive fill;
 
-    void set_trans(const glm::vec2 &trans);
-    void set_scale(float scale);
-    void set_theta(float theta);
+    glm::vec2 trans{};
+    float scale = 1.0f;
+    float theta = 0.0f;  // rotation in radians
+};
+
+struct ShapeShader {
+    ShaderPtr shader{{}, {}};
+    float screen_scale;
+    glm::vec2 drawing_area_offset; 
+
+    bool init();
+    void set_ortho(const glm::mat4 &ortho);
+    void set_screen_scale(float scale);
+    void set_drawing_area_offset(const glm::vec2 &offset);
 };
 
 struct VertexIndex {
@@ -40,7 +44,10 @@ struct VertexIndex {
     std::vector<uint32_t> index;
 };
 
-ShaderPtr make_shape_shader();
+void draw_shape(const ShapeShader &shape_shader, const Shape &shape, bool fill=true, bool line=false, bool line_highlight=false);
+
+BBox shape_bbox_to_screen_units(const ShapeShader &shader, const Shape &shape);
+glm::vec2 screen_pos_to_normalize_pos(const ShapeShader &shader, const glm::vec2 &pos);
 
 // Create all possible shapes for the game
 // All shapes are normalized to radius of 1.0 unit

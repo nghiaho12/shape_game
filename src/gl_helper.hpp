@@ -68,7 +68,27 @@ VertexBufferPtr make_vertex_buffer(const float *vertex, size_t vertex_bytes, con
 
 void draw_vertex_buffer(const ShaderPtr &shader, const VertexBufferPtr &v, const TexturePtr &optional_tex = {{}, {}});
 
-// returns xy bounding box of vertex
-std::pair<glm::vec2, glm::vec2> bbox(const std::vector<glm::vec4> &vertex);
+struct BBox {
+    glm::vec2 start;
+    glm::vec2 end;
+};
+
+template <typename GLM_VEC>
+BBox bbox(const std::vector<GLM_VEC> &vertex) {
+    float x0 = vertex[0].x;
+    float x1 = vertex[0].x;
+    float y0 = vertex[0].y;
+    float y1 = vertex[0].y;
+
+    for (const auto &v : vertex) {
+        x0 = std::min(x0, v.x);
+        x1 = std::max(x1, v.x);
+
+        y0 = std::min(y0, v.y);
+        y1 = std::max(y1, v.y);
+    }
+
+    return {glm::vec2{x0, y0}, glm::vec2{x1, y1}};
+}
 
 void enable_gl_debug_callback();

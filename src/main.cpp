@@ -38,6 +38,7 @@ constexpr float ASPECT_RATIO = 4.f / 3.f;
 const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
 const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
 constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
+constexpr float SHAPE_WIDTH = (1.f / NUM_SHAPES) * 0.4f;
 
 const glm::vec4 TEXT_FG{231 / 255.0, 202 / 255.0, 96 / 255.0, 1.0};
 const glm::vec4 TEXT_BG{0, 0, 0, 0};
@@ -96,15 +97,17 @@ struct AppState {
     glm::vec2 draw_area_offset;
     glm::vec2 draw_area_size;
     glm::vec2 draw_area_grid_size;
-    ShapePrimitive draw_area_bg;
+    Shape draw_area_bg;
 
     VertexBufferPtr score_vertex{{}, {}};
-    std::pair<glm::vec2, glm::vec2> score_vertex_bbox;
+    BBox score_vertex_bbox;
 
-    ShaderPtr shape_shader{{}, {}};
-    std::vector<Shape> shape_set;
-    std::array<Shape *, NUM_SHAPES> shape;
-    std::array<size_t, NUM_SHAPES> shape_dst;
+    ShapeShader shape_shader;
+    std::vector<Shape> shape_set; // all possible shapes
+    std::array<Shape *, NUM_SHAPES> shape; // subset of shapes
+    std::array<size_t, NUM_SHAPES> shape_src_to_dst_idx; 
+    std::array<glm::vec2, NUM_SHAPES> src_pos; // position for src shape, normalized units
+    std::array<glm::vec2, NUM_SHAPES> dst_pos; // position for dst shape, normalized units
     std::array<bool, NUM_SHAPES> shape_done;
     std::optional<size_t> selected_shape;
     std::optional<size_t> highlight_dst;
@@ -113,11 +116,8 @@ struct AppState {
 };
 
 void update_scale(AppState &as) {
-    float scale = as.draw_area_grid_size.x * 0.4f;
-
-    for (auto &s : as.shape) {
-        s->set_scale(scale);
-    }
+    float scale = as.draw_area_size.x;
+    as.shape_shader.set_screen_scale(scale);
 
     as.font.set_target_width(as.draw_area_size.x * TEXT_WIDTH);
     as.font.set_trans(glm::vec2{as.draw_area_offset.x + as.draw_area_size.x * TEXT_X,
@@ -135,7 +135,7 @@ void init_game(AppState &as) {
     size_t i = 0;
     for (auto &s : as.shape) {
         s = &as.shape_set[i];
-        as.shape_dst[i] = i;
+        as.shape_src_to_dst_idx[i] = i;
 
         if (dice_binary(g) > 0.5) {
             s->rotation_direction = 1;
@@ -147,7 +147,7 @@ void init_game(AppState &as) {
     }
 
     // Randomly assign the shape dest position
-    std::shuffle(as.shape_dst.begin(), as.shape_dst.end(), g);
+    std::shuffle(as.shape_src_to_dst_idx.begin(), as.shape_src_to_dst_idx.end(), g);
 
     for (auto &b : as.shape_done) {
         b = false;
@@ -266,20 +266,47 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->score_vertex = as->font.make_text("    ");
     update_score_text(*as);
 
-    as->shape_shader = make_shape_shader();
+    if (!as->shape_shader.init()) {
+        return SDL_APP_FAILURE;
+    }
+
     as->vao = make_vertex_array();
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // background color for drawing area
-    // the area size is determined later
-    std::vector<glm::vec2> empty(4);
-    std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
-    as->draw_area_bg.vertex_buffer = make_vertex_buffer(empty, index);
-    as->draw_area_bg.color = BG_COLOR;
+    {
+        float h = 1.0f/ ASPECT_RATIO;
+
+        std::vector<glm::vec2> vertex{
+            {0.f, 0.f},
+            {1.f, 0.f}, 
+            {1.f, h},
+            {0.f, h},
+        };
+
+        std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
+
+        as->draw_area_bg.fill.vertex_buffer = make_vertex_buffer(vertex, index);
+        as->draw_area_bg.fill.color = BG_COLOR;
+    }
 
     as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
+
+    for (auto &s: as->shape_set) {
+        s.scale = SHAPE_WIDTH;
+    }
+
+    // position for the src and dst shape
+    float div = NUM_SHAPES * 2;
+    for (size_t i=0; i < NUM_SHAPES; i++) {
+        as->src_pos[i].x = static_cast<float>(i*2 + 1) / div;
+        as->src_pos[i].y = 1.f/5.f;
+
+        as->dst_pos[i].x = static_cast<float>(i*2 + 1) / div;
+        as->dst_pos[i].y = 3.f/5.f;
+    }
 
     init_game(*as);
 
@@ -315,46 +342,20 @@ bool recalc_draw_area(AppState &as) {
         as.draw_area_offset.y = (win_hf - as.draw_area_size.y) / 2;
     }
 
+
     as.draw_area_grid_size.x = as.draw_area_size.x * 1.f / NUM_SHAPES;
     as.draw_area_grid_size.y = as.draw_area_size.y / 4.f;
 
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
 
-    as.shape_shader->use();
-    glUniformMatrix4fv(as.shape_shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+    as.shape_shader.set_drawing_area_offset(as.draw_area_offset);
+    as.shape_shader.set_ortho(ortho);
 
     as.font.shader->use();
-    glUniformMatrix4fv(as.font.shader->get_loc("projection_matrix"), 1, GL_FALSE, &ortho[0][0]);
+    glUniformMatrix4fv(as.font.shader->get_loc("ortho_matrix"), 1, GL_FALSE, &ortho[0][0]);
 
     return true;
-}
-
-void update_background(const AppState &as) {
-    glm::vec2 v[4];
-
-    const auto &offset = as.draw_area_offset;
-    const auto &size = as.draw_area_size;
-
-    v[0] = glm::vec2{offset.x, offset.y};
-    v[1] = glm::vec2{offset.x + size.x, offset.y};
-    v[2] = glm::vec2{offset.x + size.x, offset.y + size.y};
-    v[3] = glm::vec2{offset.x, offset.y + size.y};
-
-    as.draw_area_bg.vertex_buffer->update_vertex(glm::value_ptr(v[0]), sizeof(v));
-}
-
-glm::vec2 shape_index_to_src_pos(const AppState &as, size_t idx) {
-    const auto &offset = as.draw_area_offset;
-    const auto &grid_size = as.draw_area_grid_size;
-    return glm::vec2{offset.x + static_cast<float>(idx + 1) * grid_size.x - grid_size.x * 0.5, offset.y + grid_size.y};
-}
-
-glm::vec2 shape_index_to_dst_pos(const AppState &as, size_t idx) {
-    const auto &offset = as.draw_area_offset;
-    const auto &grid_size = as.draw_area_grid_size;
-    return glm::vec2{offset.x + static_cast<float>(idx + 1) * grid_size.x - grid_size.x * 0.5,
-                     offset.y + grid_size.y * 3};
 }
 
 std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
@@ -367,20 +368,17 @@ std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
         glm::vec2 pos;
 
         if (dst) {
-            pos = shape_index_to_dst_pos(as, i);
+            pos = as.dst_pos[i];
         } else {
             if (as.shape_done[i]) {
                 continue;
             }
-            pos = shape_index_to_src_pos(as, i);
+            pos = as.src_pos[i];
         }
 
-        const auto &s = *as.shape[i];
-        float dx = std::abs(pos[0] - cx);
-        float dy = std::abs(pos[1] - cy);
-        float r = s.radius * s.line.scale;
+        BBox bbox = shape_bbox_to_screen_units(as.shape_shader, *as.shape[i]);
 
-        if (dx < r && dy < r) {
+        if ((cx > bbox.start.x) && (cx < bbox.end.x) && (cy > bbox.start.y) && (cy < bbox.end.y)) {
             selected_shape = i;
             break;
         }
@@ -406,7 +404,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
         case SDL_EVENT_WINDOW_RESIZED:
             recalc_draw_area(as);
-            update_background(as);
             update_scale(as);
             break;
 
@@ -428,7 +425,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             if (as.selected_shape) {
                 std::optional<size_t> dst_idx = find_selected_shape(as, true);
 
-                if (as.shape_dst[*as.selected_shape] == dst_idx) {
+                if (as.shape_src_to_dst_idx[*as.selected_shape] == dst_idx) {
                     as.shape_done[*as.selected_shape] = true;
                     as.audio[AudioEnum::CORRECT].play();
                 }
@@ -493,11 +490,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     SDL_GL_MakeCurrent(as.window, as.gl_ctx);
 #endif
 
-    as.shape_shader->use();
+    as.shape_shader.shader->use();
 
     if (!as.init) {
         recalc_draw_area(as);
-        update_background(as);
         update_scale(as);
         as.init = true;
     }
@@ -511,52 +507,51 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     float cx = 0, cy = 0;
     SDL_GetMouseState(&cx, &cy);
 
-    as.draw_area_bg.draw(as.shape_shader);
+    draw_shape(as.shape_shader, as.draw_area_bg);
 
     for (size_t i = 0; i < as.shape.size(); i++) {
         auto &s = *as.shape[i];
-        size_t dst_idx = as.shape_dst[i];
+        size_t dst_idx = as.shape_src_to_dst_idx[i];
 
         if (as.shape_done[i]) {
-            s.set_trans(shape_index_to_dst_pos(as, dst_idx));
-
-            s.fill.draw(as.shape_shader);
-            s.line.draw(as.shape_shader);
+            s.trans = as.dst_pos[dst_idx];
+            draw_shape(as.shape_shader, s, true, true);
         } else {
             if (i == as.selected_shape) {
-                s.set_trans(glm::vec2{cx, cy});
+                glm::vec2 pos = screen_pos_to_normalize_pos(as.shape_shader, glm::vec2{cx, cy});
+                s.trans = pos;
             } else {
-                s.set_trans(shape_index_to_src_pos(as, i));
+                s.trans = as.src_pos[i];
             }
 
-            float theta = s.line.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
+            float theta = s.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
             if (theta < 0) {
                 theta = static_cast<float>(2 * M_PI);
             } else if (theta > 2 * M_PI) {
                 theta = 0.f;
             }
 
-            s.set_theta(theta);
-
-            s.fill.draw(as.shape_shader);
-            s.line.draw(as.shape_shader);
+            s.theta = theta;
+            draw_shape(as.shape_shader, s, true, true);
 
             // destination shape
+            s.trans = as.dst_pos[dst_idx];
             if (as.highlight_dst == dst_idx) {
-                s.line_highlight.trans = shape_index_to_dst_pos(as, dst_idx);
-                s.line_highlight.draw(as.shape_shader);
+                draw_shape(as.shape_shader, s, false, false, true);
             } else {
-                s.line.trans = shape_index_to_dst_pos(as, dst_idx);
-                s.line.draw(as.shape_shader);
+                draw_shape(as.shape_shader, s, false, true, false);
             }
         }
     }
 
     if (as.score > 0) {
-        glm::vec2 text_center =
-            (as.score_vertex_bbox.first + as.score_vertex_bbox.second) * 0.5f * as.font.distance_scale;
-        glm::vec2 center{as.draw_area_offset.x + 0.5 * as.draw_area_size.x - text_center.x,
-                         as.draw_area_offset.y + 0.5f * as.draw_area_size.y - text_center.y};
+        // draw the score in the middle of the drawing area
+        const BBox &bbox = as.score_vertex_bbox;
+        const glm::vec2 &offset = as.draw_area_offset;
+        const glm::vec2 &size = as.draw_area_size;
+
+        glm::vec2 text_center = (bbox.start + bbox.end) * 0.5f * as.font.distance_scale;
+        glm::vec2 center= glm::vec2{offset.x + 0.5f * size.x, offset.y + 0.5f * size.y} - text_center;
 
         as.font.set_trans(center);
         draw_vertex_buffer(as.font.shader, as.score_vertex, as.font.tex);

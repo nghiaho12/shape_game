@@ -1,7 +1,9 @@
 #include "geometry.hpp"
+#include <GLES2/gl2.h>
 
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <random>
 
 #include "gl_helper.hpp"
@@ -10,31 +12,32 @@ namespace {
 const char *vertex_shader = R"(#version 300 es
 precision mediump float;
 
-layout(location = 0) in vec2 position;
-uniform float scale;
-uniform float theta;
-uniform vec2 trans;
-uniform vec4 color;
-uniform mat4 projection_matrix;
-out vec4 v_color;
+layout(location = 0) in vec2 pos; // normalized by drawinga area width
+
+uniform float screen_scale; // scale normalized units to screen pixels
+uniform vec2 drawing_area_offset; // screen pixel units
+uniform float scale; // scale to apply on normalized units
+uniform float theta; // rotation in radians
+uniform vec2 trans; // normalized units
+uniform mat4 ortho_matrix;
 
 void main() {
     float c = cos(theta);
     float s = sin(theta);
-    mat2 R = mat2(c, s, -s, c);
+    mat2 rotation = mat2(c, s, -s, c);
 
-    gl_Position = projection_matrix * vec4(R*position*scale + trans, 0.0, 1.0);
-    v_color = color;
+    vec2 screen_pos = screen_scale*(rotation*pos*scale + trans) + drawing_area_offset;
+    gl_Position = ortho_matrix * vec4(screen_pos, 0.0, 1.0);
 })";
 
 const char *fragment_shader = R"(#version 300 es
 precision mediump float;
 
-in vec4 v_color;
-out vec4 o_color;
+uniform vec4 color;
+out vec4 frag_color;
 
 void main() {
-    o_color = v_color;
+    frag_color = color;
 })";
 
 }  // namespace
@@ -176,6 +179,9 @@ Shape make_shape(const std::vector<glm::vec2> &vert,
         shape.line_highlight.color = line_color;
     }
 
+    shape.bbox.start = glm::vec2{-1.f, -1.f};
+    shape.bbox.end= glm::vec2{1.f, 1.f};
+
     return shape;
 }
 
@@ -187,15 +193,12 @@ Shape make_shape_polygon(int sides,
     std::vector<glm::vec2> vert = make_polygon(sides, radius);
 
     Shape s = make_shape(vert, line_thickness, line_color, fill_color);
-    s.radius = *std::max_element(radius.begin(), radius.end());
 
     return s;
 }
 
 Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color) {
     Shape shape;
-
-    shape.radius = radius;
 
     std::vector<glm::vec2> vert;
 
@@ -209,17 +212,6 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     }
 
     return make_shape(vert, line_thickness, line_color, fill_color);
-}
-
-void ShapePrimitive::draw(const ShaderPtr &shader) {
-    shader->use();
-
-    glUniform1f(shader->get_loc("scale"), scale);
-    glUniform1f(shader->get_loc("theta"), theta);
-    glUniform2fv(shader->get_loc("trans"), 1, &trans[0]);
-    glUniform4fv(shader->get_loc("color"), 1, &color[0]);
-
-    draw_vertex_buffer(shader, vertex_buffer);
 }
 
 std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
@@ -265,22 +257,67 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
     return ret;
 }
 
-ShaderPtr make_shape_shader() { return make_shader(vertex_shader, fragment_shader); }
-
-void Shape::set_trans(const glm::vec2 &trans) {
-    line.trans = trans;
-    line_highlight.trans = trans;
-    fill.trans = trans;
+bool ShapeShader::init() {
+    shader = make_shader(vertex_shader, fragment_shader);
+    if (shader) {
+        return true;
+    }
+    return false;
 }
 
-void Shape::set_scale(float scale) {
-    line.scale = scale;
-    line_highlight.scale = scale;
-    fill.scale = scale;
+void ShapeShader::set_screen_scale(float scale) {
+    assert(shader);
+    shader->use();
+    glUniform1f(shader->get_loc("screen_scale"), scale);
+    screen_scale = scale;
 }
 
-void Shape::set_theta(float theta) {
-    line.theta = theta;
-    line_highlight.theta = theta;
-    fill.theta = theta;
+void ShapeShader::set_drawing_area_offset(const glm::vec2 &offset) {
+    assert(shader);
+    shader->use();
+    glUniform2fv(shader->get_loc("drawing_area_offset"), 1, glm::value_ptr(offset));
+    drawing_area_offset = offset;
+}
+
+void ShapeShader::set_ortho(const glm::mat4 &ortho) {
+    assert(shader);
+    shader->use();
+    glUniformMatrix4fv(shader->get_loc("ortho_matrix"), 1, GL_FALSE, glm::value_ptr(ortho));
+}
+
+BBox shape_bbox_to_screen_units(const ShapeShader &shader, const Shape &shape) {
+    BBox bbox = shape.bbox;
+    bbox.start = shader.drawing_area_offset + bbox.start * shader.screen_scale;
+    bbox.end = shader.drawing_area_offset + bbox.end * shader.screen_scale;
+
+    return bbox;
+}
+
+glm::vec2 screen_pos_to_normalize_pos(const ShapeShader &shader, const glm::vec2 &pos) {
+    return (pos - shader.drawing_area_offset) / shader.screen_scale;
+}
+
+void draw_shape(const ShapeShader &shape_shader, const Shape &shape, bool fill, bool line, bool line_highlight) {
+    const ShaderPtr &s = shape_shader.shader;
+
+    s->use();
+
+    glUniform1f(s->get_loc("scale"), shape.scale);
+    glUniform1f(s->get_loc("theta"), shape.theta);
+    glUniform2fv(s->get_loc("trans"), 1, glm::value_ptr(shape.trans));
+
+    if (fill) {
+        glUniform4fv(s->get_loc("color"), 1, glm::value_ptr(shape.fill.color));
+        draw_vertex_buffer(s, shape.fill.vertex_buffer);
+    }
+
+    if (line) {
+        glUniform4fv(s->get_loc("color"), 1, glm::value_ptr(shape.line.color));
+        draw_vertex_buffer(s, shape.line.vertex_buffer);
+    }
+
+    if (line_highlight) {
+        glUniform4fv(s->get_loc("color"), 1, glm::value_ptr(shape.line_highlight.color));
+        draw_vertex_buffer(s, shape.line_highlight.vertex_buffer);
+    }
 }
