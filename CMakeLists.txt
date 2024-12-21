@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(shape_game)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic -Wconversion")
+set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -Wpedantic -Wconversion")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for nvim LSP support
 
 set(EXECUTABLE_NAME ${PROJECT_NAME})

@@ -44,9 +44,9 @@ struct VertexIndex {
     std::vector<uint32_t> index;
 };
 
-void draw_shape(const ShapeShader &shape_shader, const Shape &shape, bool fill=true, bool line=false, bool line_highlight=false);
+void draw_shape(const ShapeShader &shape_shader, const Shape &shape, bool fill, bool line, bool line_highlight);
 
-BBox shape_bbox_to_screen_units(const ShapeShader &shader, const Shape &shape);
+glm::vec2 normalize_pos_to_screen_pos(const ShapeShader &shader, const glm::vec2 &pos);
 glm::vec2 screen_pos_to_normalize_pos(const ShapeShader &shader, const glm::vec2 &pos);
 
 // Create all possible shapes for the game
@@ -56,6 +56,7 @@ std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<st
 std::vector<glm::vec2> make_polygon(int sides, const std::vector<float> &radius);
 VertexIndex make_fill(const std::vector<glm::vec2> &vert);
 VertexIndex make_line(const std::vector<glm::vec2> &vert, float thickness);
+
 Shape make_shape(const std::vector<glm::vec2> &vert,
                  float line_thickness,
                  const glm::vec4 &line_color,
@@ -65,4 +66,5 @@ Shape make_shape_polygon(int sides,
                          float line_thickness,
                          const glm::vec4 &line_color,
                          const glm::vec4 &fill_color);
+
 Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color, const glm::vec4 &fill_color);

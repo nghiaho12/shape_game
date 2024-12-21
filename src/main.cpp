@@ -1,3 +1,4 @@
+#include <SDL3/SDL_events.h>
 #define SDL_MAIN_USE_CALLBACKS  // use the callbacks instead of main()
 #define GL_GLEXT_PROTOTYPES
 
@@ -34,20 +35,20 @@
 
 constexpr int NUM_SHAPES = 5;
 constexpr int MAX_SCORE = 100;  // score will wrap
+                                
 constexpr float ASPECT_RATIO = 4.f / 3.f;
-const glm::vec4 LINE_COLOR{1.f, 1.f, 1.f, 1.f};
-const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
-constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
-constexpr float SHAPE_WIDTH = (1.f / NUM_SHAPES) * 0.4f;
+constexpr float NORM_HEIGHT = 1.f / ASPECT_RATIO;
 
-const glm::vec4 TEXT_FG{231 / 255.0, 202 / 255.0, 96 / 255.0, 1.0};
-const glm::vec4 TEXT_BG{0, 0, 0, 0};
-const glm::vec4 TEXT_OUTLINE{1, 1, 1, 1};
-constexpr float TEXT_OUTLINE_FACTOR = 0.1f;
-// units as percentage of drawing width
-constexpr float TEXT_WIDTH = 0.2f;
-constexpr float TEXT_X = 0.f;
-constexpr float TEXT_Y = 0.98f;
+constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
+constexpr float SHAPE_RADIUS = (1.f / NUM_SHAPES) * 0.4f;
+const glm::vec4 SHAPE_LINE_COLOR{1.f, 1.f, 1.f, 1.f};
+const glm::vec4 SHAPE_BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
+
+const glm::vec4 FONT_FG{231 / 255.0, 202 / 255.0, 96 / 255.0, 1.0};
+const glm::vec4 FONT_BG{0, 0, 0, 0};
+const glm::vec4 FONT_OUTLINE{1, 1, 1, 1};
+constexpr float FONT_OUTLINE_FACTOR = 0.1f;
+constexpr float FONT_WIDTH = 0.2f;
 
 std::map<std::string, glm::vec4> tableau10_palette() {
     const std::map<std::string, uint32_t> color{
@@ -87,11 +88,11 @@ struct AppState {
     SDL_AudioDeviceID audio_device = 0;
     std::map<AudioEnum, Audio> audio;
 
-    FontAtlas font;
-    VertexArrayPtr vao{{}, {}};
-
     int score = 0;
     bool init = false;
+
+    FontAtlas font;
+    FontShader font_shader;
 
     // drawing area within the window
     glm::vec2 draw_area_offset;
@@ -99,6 +100,7 @@ struct AppState {
     glm::vec2 draw_area_grid_size;
     Shape draw_area_bg;
 
+    VertexArrayPtr vao{{}, {}};
     VertexBufferPtr score_vertex{{}, {}};
     BBox score_vertex_bbox;
 
@@ -106,8 +108,8 @@ struct AppState {
     std::vector<Shape> shape_set; // all possible shapes
     std::array<Shape *, NUM_SHAPES> shape; // subset of shapes
     std::array<size_t, NUM_SHAPES> shape_src_to_dst_idx; 
-    std::array<glm::vec2, NUM_SHAPES> src_pos; // position for src shape, normalized units
-    std::array<glm::vec2, NUM_SHAPES> dst_pos; // position for dst shape, normalized units
+    std::array<glm::vec2, NUM_SHAPES> src_center; // position for src shape, normalized units
+    std::array<glm::vec2, NUM_SHAPES> dst_center; // position for dst shape, normalized units
     std::array<bool, NUM_SHAPES> shape_done;
     std::optional<size_t> selected_shape;
     std::optional<size_t> highlight_dst;
@@ -115,13 +117,50 @@ struct AppState {
     uint64_t last_tick = 0;
 };
 
-void update_scale(AppState &as) {
+bool resize_event(AppState &as) {
+    int win_w, win_h;
+
+    if (!SDL_GetWindowSize(as.window, &win_w, &win_h)) {
+        LOG("%s", SDL_GetError());
+        return false;
+    }
+
+#ifdef __EMSCRIPTEN__
+    emscripten_set_canvas_element_size("#canvas", win_w, win_h);
+#endif
+
+    float win_wf = static_cast<float>(win_w);
+    float win_hf = static_cast<float>(win_h);
+
+    if (win_w > win_h) {
+        as.draw_area_size.y = win_hf;
+        as.draw_area_size.x = win_hf * ASPECT_RATIO;
+        as.draw_area_offset.x = (win_wf - as.draw_area_size.x) / 2;
+        as.draw_area_offset.y = 0;
+    } else {
+        as.draw_area_size.x = win_wf;
+        as.draw_area_size.y = win_wf / ASPECT_RATIO;
+        as.draw_area_offset.x = 0;
+        as.draw_area_offset.y = (win_hf - as.draw_area_size.y) / 2;
+    }
+
+    as.draw_area_grid_size.x = as.draw_area_size.x * 1.f / NUM_SHAPES;
+    as.draw_area_grid_size.y = as.draw_area_size.y / 4.f;
+
+    glViewport(0, 0, win_w, win_h);
+    glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
+
     float scale = as.draw_area_size.x;
+
+    as.shape_shader.set_ortho(ortho);
+    as.shape_shader.set_drawing_area_offset(as.draw_area_offset);
     as.shape_shader.set_screen_scale(scale);
 
-    as.font.set_target_width(as.draw_area_size.x * TEXT_WIDTH);
-    as.font.set_trans(glm::vec2{as.draw_area_offset.x + as.draw_area_size.x * TEXT_X,
-                                as.draw_area_offset.y + as.draw_area_size.y * TEXT_Y});
+    as.font_shader.set_ortho(ortho);
+    as.font_shader.set_screen_scale(scale);
+    as.font_shader.set_drawing_area_offset(as.draw_area_offset);
+
+    return true;
 }
 
 void init_game(AppState &as) {
@@ -156,7 +195,7 @@ void init_game(AppState &as) {
     as.selected_shape.reset();
     as.highlight_dst.reset();
 
-    update_scale(as);
+    resize_event(as);
 }
 
 bool init_audio(AppState &as, const std::string &base_path) {
@@ -192,21 +231,60 @@ bool init_font(AppState &as, const std::string &base_path) {
         return false;
     }
 
-    as.font.set_fg(TEXT_FG);
-    as.font.set_bg(TEXT_BG);
-    as.font.set_outline(TEXT_OUTLINE);
-    as.font.set_outline_factor(TEXT_OUTLINE_FACTOR);
+    if (!as.font_shader.init(as.font)) {
+        return false;
+    }
+
+    as.font_shader.set_font_distance_range(static_cast<float>(as.font.distance_range));
+    as.font_shader.set_font_grid_width(static_cast<float>(as.font.grid_width));
+    as.font_shader.set_font_target_width(FONT_WIDTH);
+
+    as.font_shader.set_fg(FONT_FG);
+    as.font_shader.set_bg(FONT_BG);
+    as.font_shader.set_outline(FONT_OUTLINE);
+    as.font_shader.set_outline_factor(FONT_OUTLINE_FACTOR);
 
     return true;
 }
 
 void update_score_text(AppState &as) {
-    auto [vertex, index] = as.font.make_text_vertex(std::to_string(as.score));
+    auto [vertex, index] = as.font.make_text_vertex(std::to_string(as.score), true);
     as.score_vertex_bbox = bbox(vertex);
     as.score_vertex->update_vertex(
         glm::value_ptr(vertex[0]), sizeof(decltype(vertex)::value_type) * vertex.size(), index);
 }
 
+std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
+    float cx, cy;
+    SDL_GetMouseState(&cx, &cy);
+
+    std::optional<size_t> selected_shape;
+
+    glm::vec2 shape_radius{SHAPE_RADIUS, SHAPE_RADIUS};
+
+    for (size_t i = 0; i < NUM_SHAPES; i++) {
+        glm::vec2 center;
+
+        if (dst) {
+            center = as.dst_center[i];
+        } else {
+            if (as.shape_done[i]) {
+                continue;
+            }
+            center = as.src_center[i];
+        }
+
+        glm::vec2 start = normalize_pos_to_screen_pos(as.shape_shader, center - shape_radius); 
+        glm::vec2 end = normalize_pos_to_screen_pos(as.shape_shader, center + shape_radius);
+
+        if ((cx > start.x) && (cx < end.x) && (cy > start.y) && (cy < end.y)) {
+            selected_shape = i;
+            break;
+        }
+    }
+
+    return selected_shape;
+}
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // Unused
     (void)argc;
@@ -263,7 +341,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // pre-allocate all vertex we need
     // number of space needs to be >= MAX_SCORE string
-    as->score_vertex = as->font.make_text("    ");
+    as->score_vertex = as->font.make_text("    ", true);
     update_score_text(*as);
 
     if (!as->shape_shader.init()) {
@@ -289,25 +367,23 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
 
         as->draw_area_bg.fill.vertex_buffer = make_vertex_buffer(vertex, index);
-        as->draw_area_bg.fill.color = BG_COLOR;
+        as->draw_area_bg.fill.color = SHAPE_BG_COLOR;
     }
 
-    as->shape_set = make_shape_set(LINE_COLOR, tableau10_palette());
+    as->shape_set = make_shape_set(SHAPE_LINE_COLOR, tableau10_palette());
 
     for (auto &s: as->shape_set) {
-        s.scale = SHAPE_WIDTH;
+        s.scale = SHAPE_RADIUS;
     }
 
     // position for the src and dst shape
     float div = NUM_SHAPES * 2;
-    float norm_h = 1.f / ASPECT_RATIO;
-
     for (size_t i=0; i < NUM_SHAPES; i++) {
-        as->src_pos[i].x = static_cast<float>(i*2 + 1) / div;
-        as->src_pos[i].y = norm_h * 1.f/4.f;
+        as->src_center[i].x = static_cast<float>(i*2 + 1) / div;
+        as->src_center[i].y = NORM_HEIGHT * 1.f/4.f;
 
-        as->dst_pos[i].x = static_cast<float>(i*2 + 1) / div;
-        as->dst_pos[i].y = norm_h * 3.f/4.f;
+        as->dst_center[i].x = static_cast<float>(i*2 + 1) / div;
+        as->dst_center[i].y = NORM_HEIGHT * 3.f/4.f;
     }
 
     init_game(*as);
@@ -315,78 +391,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     as->last_tick = SDL_GetTicks();
 
     return SDL_APP_CONTINUE;
-}
-
-bool recalc_draw_area(AppState &as) {
-    int win_w, win_h;
-
-    if (!SDL_GetWindowSize(as.window, &win_w, &win_h)) {
-        LOG("%s", SDL_GetError());
-        return false;
-    }
-
-#ifdef __EMSCRIPTEN__
-    emscripten_set_canvas_element_size("#canvas", win_w, win_h);
-#endif
-
-    float win_wf = static_cast<float>(win_w);
-    float win_hf = static_cast<float>(win_h);
-
-    if (win_w > win_h) {
-        as.draw_area_size.y = win_hf;
-        as.draw_area_size.x = win_hf * ASPECT_RATIO;
-        as.draw_area_offset.x = (win_wf - as.draw_area_size.x) / 2;
-        as.draw_area_offset.y = 0;
-    } else {
-        as.draw_area_size.x = win_wf;
-        as.draw_area_size.y = win_wf / ASPECT_RATIO;
-        as.draw_area_offset.x = 0;
-        as.draw_area_offset.y = (win_hf - as.draw_area_size.y) / 2;
-    }
-
-
-    as.draw_area_grid_size.x = as.draw_area_size.x * 1.f / NUM_SHAPES;
-    as.draw_area_grid_size.y = as.draw_area_size.y / 4.f;
-
-    glViewport(0, 0, win_w, win_h);
-    glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
-
-    as.shape_shader.set_drawing_area_offset(as.draw_area_offset);
-    as.shape_shader.set_ortho(ortho);
-
-    as.font.shader->use();
-    glUniformMatrix4fv(as.font.shader->get_loc("ortho_matrix"), 1, GL_FALSE, &ortho[0][0]);
-
-    return true;
-}
-
-std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
-    float cx, cy;
-    SDL_GetMouseState(&cx, &cy);
-
-    std::optional<size_t> selected_shape;
-
-    for (size_t i = 0; i < NUM_SHAPES; i++) {
-        glm::vec2 pos;
-
-        if (dst) {
-            pos = as.dst_pos[i];
-        } else {
-            if (as.shape_done[i]) {
-                continue;
-            }
-            pos = as.src_pos[i];
-        }
-
-        BBox bbox = shape_bbox_to_screen_units(as.shape_shader, *as.shape[i]);
-
-        if ((cx > bbox.start.x) && (cx < bbox.end.x) && (cy > bbox.start.y) && (cy < bbox.end.y)) {
-            selected_shape = i;
-            break;
-        }
-    }
-
-    return selected_shape;
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
@@ -405,8 +409,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             break;
 
         case SDL_EVENT_WINDOW_RESIZED:
-            recalc_draw_area(as);
-            update_scale(as);
+            resize_event(as);
             break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -495,8 +498,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     as.shape_shader.shader->use();
 
     if (!as.init) {
-        recalc_draw_area(as);
-        update_scale(as);
+        resize_event(as);
         as.init = true;
     }
 
@@ -509,54 +511,51 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     float cx = 0, cy = 0;
     SDL_GetMouseState(&cx, &cy);
 
-    draw_shape(as.shape_shader, as.draw_area_bg);
+    draw_shape(as.shape_shader, as.draw_area_bg, true, false, false);
+
+    if (as.score > 0) {
+        // draw the score in the middle of the drawing area
+        const BBox &bbox = as.score_vertex_bbox;
+
+        glm::vec2 text_center = (bbox.start + bbox.end) * 0.5f * FONT_WIDTH;
+        glm::vec2 trans = glm::vec2{0.5f, NORM_HEIGHT*0.5f} - text_center;
+
+        as.font_shader.set_trans(trans);
+        draw_vertex_buffer(as.font_shader.shader, as.score_vertex, as.font.tex);
+    }
 
     for (size_t i = 0; i < as.shape.size(); i++) {
         auto &s = *as.shape[i];
         size_t dst_idx = as.shape_src_to_dst_idx[i];
 
         if (as.shape_done[i]) {
-            s.trans = as.dst_pos[dst_idx];
-            draw_shape(as.shape_shader, s, true, true);
+            s.trans = as.dst_center[dst_idx];
+            draw_shape(as.shape_shader, s, true, true, false);
         } else {
             if (i == as.selected_shape) {
                 glm::vec2 pos = screen_pos_to_normalize_pos(as.shape_shader, glm::vec2{cx, cy});
                 s.trans = pos;
             } else {
-                s.trans = as.src_pos[i];
+                s.trans = as.src_center[i];
             }
 
-            float theta = s.theta + SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
-            if (theta < 0) {
-                theta = static_cast<float>(2 * M_PI);
-            } else if (theta > 2 * M_PI) {
-                theta = 0.f;
+            s.theta += SHAPE_ROTATION_SPEED * s.rotation_direction * dt;
+            if (s.theta < 0) {
+                s.theta = static_cast<float>(2 * M_PI);
+            } else if (s.theta > 2 * M_PI) {
+                s.theta = 0.f;
             }
 
-            s.theta = theta;
-            draw_shape(as.shape_shader, s, true, true);
+            draw_shape(as.shape_shader, s, true, true, false);
 
             // destination shape
-            s.trans = as.dst_pos[dst_idx];
+            s.trans = as.dst_center[dst_idx];
             if (as.highlight_dst == dst_idx) {
                 draw_shape(as.shape_shader, s, false, false, true);
             } else {
                 draw_shape(as.shape_shader, s, false, true, false);
             }
         }
-    }
-
-    if (as.score > 0) {
-        // draw the score in the middle of the drawing area
-        const BBox &bbox = as.score_vertex_bbox;
-        const glm::vec2 &offset = as.draw_area_offset;
-        const glm::vec2 &size = as.draw_area_size;
-
-        glm::vec2 text_center = (bbox.start + bbox.end) * 0.5f * as.font.distance_scale;
-        glm::vec2 center= glm::vec2{offset.x + 0.5f * size.x, offset.y + 0.5f * size.y} - text_center;
-
-        as.font.set_trans(center);
-        draw_vertex_buffer(as.font.shader, as.score_vertex, as.font.tex);
     }
 
     SDL_GL_SwapWindow(as.window);

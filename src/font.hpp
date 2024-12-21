@@ -2,9 +2,7 @@
 
 #include <SDL3/SDL_opengles2.h>
 
-#include <glm/ext/vector_float4.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
+#include <glm/glm.hpp>
 #include <map>
 #include <utility>
 
@@ -26,34 +24,40 @@ struct Glyph {
 };
 
 struct FontAtlas {
-    ShaderPtr shader{{}, {}};
     TexturePtr tex{{}, {}};
-    VertexBufferPtr letter{{}, {}};
 
     int distance_range;  // signed distance field range in pixels
     float em_size;       // pixels per em unit
     int grid_width;
     int grid_height;
     std::map<int, Glyph> glyph;
-    float distance_scale;  // scales up distance_range
 
     bool load(const std::string &atlas_path, const std::string &atlas_txt);
+    VertexBufferPtr make_text(const std::string &str, bool normalize);
+    std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> make_text_vertex(const std::string &str, bool normalize);
 
-    void set_target_width(float pixel);
-    void set_trans(const glm::vec2 &trans);  // vertex shader
+    std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);
+    std::vector<glm::vec4> make_letter(float x, float y, char ch);
+};
+
+struct FontShader {
+    ShaderPtr shader{{}, {}};
+
+    bool init(const FontAtlas &font_atlas);
+
+    // call when window resizes
+    void set_ortho(const glm::mat4 &ortho) const;
+    void set_screen_scale(float scale) const;
+    void set_drawing_area_offset(const glm::vec2 &offset) const;
+
+    // call in init usually
+    void set_font_distance_range(float range) const;
+    void set_font_grid_width(float range) const;
+    void set_font_target_width(float target_width) const;
+
+    void set_trans(const glm::vec2 &trans) const;  
     void set_fg(const glm::vec4 &color) const;
     void set_bg(const glm::vec4 &color) const;
     void set_outline(const glm::vec4 &color) const;
     void set_outline_factor(float factor) const;
-
-    std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);
-
-    // for static text
-    std::vector<glm::vec4> make_letter(float x, float y, char ch);
-    std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> make_text_vertex(const std::string &str);
-    VertexBufferPtr make_text(const std::string &str);
-
-    // For drawing text on the fly
-    void draw_letter(float x, float y, char ch);
-    void draw_string(float x, float y, const std::string &str);
 };

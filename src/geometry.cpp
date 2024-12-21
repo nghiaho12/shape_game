@@ -285,12 +285,8 @@ void ShapeShader::set_ortho(const glm::mat4 &ortho) {
     glUniformMatrix4fv(shader->get_loc("ortho_matrix"), 1, GL_FALSE, glm::value_ptr(ortho));
 }
 
-BBox shape_bbox_to_screen_units(const ShapeShader &shader, const Shape &shape) {
-    BBox bbox = shape.bbox;
-    bbox.start = shader.drawing_area_offset + bbox.start * shader.screen_scale;
-    bbox.end = shader.drawing_area_offset + bbox.end * shader.screen_scale;
-
-    return bbox;
+glm::vec2 normalize_pos_to_screen_pos(const ShapeShader &shader, const glm::vec2 &pos) {
+    return shader.drawing_area_offset + pos * shader.screen_scale;
 }
 
 glm::vec2 screen_pos_to_normalize_pos(const ShapeShader &shader, const glm::vec2 &pos) {
