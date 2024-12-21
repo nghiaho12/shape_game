@@ -39,10 +39,11 @@ constexpr int MAX_SCORE = 100;  // score will wrap
 constexpr float ASPECT_RATIO = 4.f / 3.f;
 constexpr float NORM_HEIGHT = 1.f / ASPECT_RATIO;
 
+const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
+
 constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
 constexpr float SHAPE_RADIUS = (1.f / NUM_SHAPES) * 0.4f;
 const glm::vec4 SHAPE_LINE_COLOR{1.f, 1.f, 1.f, 1.f};
-const glm::vec4 SHAPE_BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
 
 const glm::vec4 FONT_FG{231 / 255.0, 202 / 255.0, 96 / 255.0, 1.0};
 const glm::vec4 FONT_BG{0, 0, 0, 0};
@@ -355,19 +356,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // background color for drawing area
     {
-        float h = 1.0f / ASPECT_RATIO;
-
         std::vector<glm::vec2> vertex{
             {0.f, 0.f},
             {1.f, 0.f},
-            {1.f, h},
-            {0.f, h},
+            {1.f, NORM_HEIGHT},
+            {0.f, NORM_HEIGHT},
         };
 
-        std::vector<uint32_t> index{0, 1, 2, 0, 2, 3};
-
-        as->draw_area_bg.fill.vertex_buffer = make_vertex_buffer(vertex, index);
-        as->draw_area_bg.fill.color = SHAPE_BG_COLOR;
+        as->draw_area_bg = make_shape(vertex, 0, {}, BG_COLOR);
     }
 
     as->shape_set = make_shape_set(SHAPE_LINE_COLOR, tableau10_palette());
