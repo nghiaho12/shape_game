@@ -35,7 +35,7 @@
 
 constexpr int NUM_SHAPES = 5;
 constexpr int MAX_SCORE = 100;  // score will wrap
-                                
+
 constexpr float ASPECT_RATIO = 4.f / 3.f;
 constexpr float NORM_HEIGHT = 1.f / ASPECT_RATIO;
 
@@ -105,11 +105,11 @@ struct AppState {
     BBox score_vertex_bbox;
 
     ShapeShader shape_shader;
-    std::vector<Shape> shape_set; // all possible shapes
-    std::array<Shape *, NUM_SHAPES> shape; // subset of shapes
-    std::array<size_t, NUM_SHAPES> shape_src_to_dst_idx; 
-    std::array<glm::vec2, NUM_SHAPES> src_center; // position for src shape, normalized units
-    std::array<glm::vec2, NUM_SHAPES> dst_center; // position for dst shape, normalized units
+    std::vector<Shape> shape_set;           // all possible shapes
+    std::array<Shape *, NUM_SHAPES> shape;  // subset of shapes
+    std::array<size_t, NUM_SHAPES> shape_src_to_dst_idx;
+    std::array<glm::vec2, NUM_SHAPES> src_center;  // position for src shape, normalized units
+    std::array<glm::vec2, NUM_SHAPES> dst_center;  // position for dst shape, normalized units
     std::array<bool, NUM_SHAPES> shape_done;
     std::optional<size_t> selected_shape;
     std::optional<size_t> highlight_dst;
@@ -274,7 +274,7 @@ std::optional<size_t> find_selected_shape(const AppState &as, bool dst) {
             center = as.src_center[i];
         }
 
-        glm::vec2 start = normalize_pos_to_screen_pos(as.shape_shader, center - shape_radius); 
+        glm::vec2 start = normalize_pos_to_screen_pos(as.shape_shader, center - shape_radius);
         glm::vec2 end = normalize_pos_to_screen_pos(as.shape_shader, center + shape_radius);
 
         if ((cx > start.x) && (cx < end.x) && (cy > start.y) && (cy < end.y)) {
@@ -355,11 +355,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // background color for drawing area
     {
-        float h = 1.0f/ ASPECT_RATIO;
+        float h = 1.0f / ASPECT_RATIO;
 
         std::vector<glm::vec2> vertex{
             {0.f, 0.f},
-            {1.f, 0.f}, 
+            {1.f, 0.f},
             {1.f, h},
             {0.f, h},
         };
@@ -372,18 +372,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     as->shape_set = make_shape_set(SHAPE_LINE_COLOR, tableau10_palette());
 
-    for (auto &s: as->shape_set) {
+    for (auto &s : as->shape_set) {
         s.scale = SHAPE_RADIUS;
     }
 
     // position for the src and dst shape
     float div = NUM_SHAPES * 2;
-    for (size_t i=0; i < NUM_SHAPES; i++) {
-        as->src_center[i].x = static_cast<float>(i*2 + 1) / div;
-        as->src_center[i].y = NORM_HEIGHT * 1.f/4.f;
+    for (size_t i = 0; i < NUM_SHAPES; i++) {
+        as->src_center[i].x = static_cast<float>(i * 2 + 1) / div;
+        as->src_center[i].y = NORM_HEIGHT * 1.f / 4.f;
 
-        as->dst_center[i].x = static_cast<float>(i*2 + 1) / div;
-        as->dst_center[i].y = NORM_HEIGHT * 3.f/4.f;
+        as->dst_center[i].x = static_cast<float>(i * 2 + 1) / div;
+        as->dst_center[i].y = NORM_HEIGHT * 3.f / 4.f;
     }
 
     init_game(*as);
@@ -518,7 +518,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         const BBox &bbox = as.score_vertex_bbox;
 
         glm::vec2 text_center = (bbox.start + bbox.end) * 0.5f * FONT_WIDTH;
-        glm::vec2 trans = glm::vec2{0.5f, NORM_HEIGHT*0.5f} - text_center;
+        glm::vec2 trans = glm::vec2{0.5f, NORM_HEIGHT * 0.5f} - text_center;
 
         as.font_shader.set_trans(trans);
         draw_vertex_buffer(as.font_shader.shader, as.score_vertex, as.font.tex);

@@ -1,6 +1,7 @@
 #include "font.hpp"
 
 #include <SDL3/SDL_surface.h>
+
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
 #include <sstream>
@@ -176,7 +177,8 @@ std::vector<glm::vec4> FontAtlas::make_letter(float x, float y, char ch) {
     };
 }
 
-std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> FontAtlas::make_text_vertex(const std::string &str, bool normalize) {
+std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> FontAtlas::make_text_vertex(const std::string &str,
+                                                                                     bool normalize) {
     float xpos = 0;
 
     std::vector<glm::vec4> vertex_uv;
@@ -188,11 +190,11 @@ std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> FontAtlas::make_text_ve
         auto v = make_letter(xpos, 0, ch);
 
         if (normalize) {
-            for (auto &v_: v) {
+            for (auto &v_ : v) {
                 v_.x /= static_cast<float>(grid_width);
                 v_.y /= static_cast<float>(grid_width);
             }
-        } 
+        }
 
         vertex_uv.insert(vertex_uv.end(), v.begin(), v.end());
 

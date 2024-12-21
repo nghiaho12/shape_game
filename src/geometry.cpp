@@ -1,4 +1,5 @@
 #include "geometry.hpp"
+
 #include <GLES2/gl2.h>
 
 #include <algorithm>
@@ -180,7 +181,7 @@ Shape make_shape(const std::vector<glm::vec2> &vert,
     }
 
     shape.bbox.start = glm::vec2{-1.f, -1.f};
-    shape.bbox.end= glm::vec2{1.f, 1.f};
+    shape.bbox.end = glm::vec2{1.f, 1.f};
 
     return shape;
 }

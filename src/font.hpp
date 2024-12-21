@@ -55,7 +55,7 @@ struct FontShader {
     void set_font_grid_width(float range) const;
     void set_font_target_width(float target_width) const;
 
-    void set_trans(const glm::vec2 &trans) const;  
+    void set_trans(const glm::vec2 &trans) const;
     void set_fg(const glm::vec4 &color) const;
     void set_bg(const glm::vec4 &color) const;
     void set_outline(const glm::vec4 &color) const;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL_opengles2.h>
+
 #include <glm/glm.hpp>
 #include <map>
 #include <string>
@@ -31,7 +32,7 @@ struct Shape {
 struct ShapeShader {
     ShaderPtr shader{{}, {}};
     float screen_scale;
-    glm::vec2 drawing_area_offset; 
+    glm::vec2 drawing_area_offset;
 
     bool init();
     void set_ortho(const glm::mat4 &ortho);
