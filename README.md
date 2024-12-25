@@ -1,10 +1,7 @@
 Simple shape matching game for kids written using SDL3 and OpenGL ES.
-It has been tested on Ubuntu 24.04, Android 14 and web (Firefox 130.0, Chromimum 131.0).
+It rus on Ubuntu 24.04, Android 14, Firefox 130.0 and Chromimum 131.0.
 
-You might find some code snippets in here useful for other projects, such as
-
-- Signed Distance Field (SDF) for rendering sharp scaled fonts 
-- Drawing polygons with control over line thickness 
+![screenshot](screenshot.png)
 
 # Install
 ## Prerequisite
@@ -18,15 +15,12 @@ Install Docker if you want to build for Android or web.
 sudo apt install docker-ce
 ```
 
-## Linux
-Install SDL 3 (https://github.com/libsdl-org/SDL/)
+For Linux, install SDL 3 (https://github.com/libsdl-org/SDL/).
 
+## Linux
 ```
-mkdir build
-cd build
-cmake ..
-make
-cd ..
+cmake -B build
+cmake --build build
 ./build/shape_game
 ```
 
@@ -46,7 +40,7 @@ docker build -f Dockerfile.android -t shape_game_android .
 docker run --rm --network=host shape_game_android
 ```
 
-Point your browser to http://[IP of host]:8000 on your Android web browser and download the APK.
+Point your Android web browser to http://[IP of host]:8000. Download and install the APK.
 
 # Credits
 Sound assets 
@@ -57,7 +51,7 @@ Sound assets
 Ogg Vorbis decoder
 - https://github.com/nothings/stb
 
-SDF font
+Signed Distance Field (SDF) font
 - https://github.com/Chlumsky/msdfgen
 
 # Contact
