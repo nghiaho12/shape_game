@@ -27,11 +27,11 @@
 #endif
 
 #include "audio.hpp"
+#include "color_palette.hpp"
 #include "font.hpp"
 #include "geometry.hpp"
 #include "gl_helper.hpp"
 #include "log.hpp"
-#include "color_palette.hpp"
 
 constexpr int NUM_SHAPES = 5;
 constexpr int MAX_SCORE = 100;  // score will wrap
@@ -83,9 +83,6 @@ struct AppState {
     FontShader font_shader;
 
     // drawing area within the window
-    glm::vec2 draw_area_offset;
-    glm::vec2 draw_area_size;
-    glm::vec2 draw_area_grid_size;
     Shape draw_area_bg;
 
     VertexArrayPtr vao{{}, {}};
@@ -93,6 +90,7 @@ struct AppState {
     BBox score_vertex_bbox;
 
     ShapeShader shape_shader;
+
     std::vector<Shape> shape_set;           // all possible shapes
     std::array<Shape *, NUM_SHAPES> shape;  // subset of shapes
     std::array<size_t, NUM_SHAPES> shape_src_to_dst_idx;
@@ -120,33 +118,33 @@ bool resize_event(AppState &as) {
     float win_wf = static_cast<float>(win_w);
     float win_hf = static_cast<float>(win_h);
 
-    if (win_w > win_h) {
-        as.draw_area_size.y = win_hf;
-        as.draw_area_size.x = win_hf * ASPECT_RATIO;
-        as.draw_area_offset.x = (win_wf - as.draw_area_size.x) / 2;
-        as.draw_area_offset.y = 0;
-    } else {
-        as.draw_area_size.x = win_wf;
-        as.draw_area_size.y = win_wf / ASPECT_RATIO;
-        as.draw_area_offset.x = 0;
-        as.draw_area_offset.y = (win_hf - as.draw_area_size.y) / 2;
-    }
+    glm::vec2 draw_area_offset;
+    glm::vec2 draw_area_size;
 
-    as.draw_area_grid_size.x = as.draw_area_size.x * 1.f / NUM_SHAPES;
-    as.draw_area_grid_size.y = as.draw_area_size.y / 4.f;
+    if (win_w > win_h) {
+        draw_area_size.y = win_hf;
+        draw_area_size.x = win_hf * ASPECT_RATIO;
+        draw_area_offset.x = (win_wf - draw_area_size.x) / 2;
+        draw_area_offset.y = 0;
+    } else {
+        draw_area_size.x = win_wf;
+        draw_area_size.y = win_wf / ASPECT_RATIO;
+        draw_area_offset.x = 0;
+        draw_area_offset.y = (win_hf - draw_area_size.y) / 2;
+    }
 
     glViewport(0, 0, win_w, win_h);
     glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
 
-    float scale = as.draw_area_size.x;
+    float scale = draw_area_size.x;
 
     as.shape_shader.set_ortho(ortho);
-    as.shape_shader.set_drawing_area_offset(as.draw_area_offset);
+    as.shape_shader.set_drawing_area_offset(draw_area_offset);
     as.shape_shader.set_screen_scale(scale);
 
     as.font_shader.set_ortho(ortho);
     as.font_shader.set_screen_scale(scale);
-    as.font_shader.set_drawing_area_offset(as.draw_area_offset);
+    as.font_shader.set_drawing_area_offset(draw_area_offset);
 
     return true;
 }

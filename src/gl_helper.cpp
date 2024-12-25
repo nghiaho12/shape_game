@@ -1,4 +1,5 @@
 #include <GLES2/gl2.h>
+
 #include <glm/gtc/type_ptr.hpp>
 #define GL_GLEXT_PROTOTYPES
 #include <SDL3/SDL_opengles2.h>
