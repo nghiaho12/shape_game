@@ -33,6 +33,11 @@
 #include "gl_helper.hpp"
 #include "log.hpp"
 
+// All co-ordinates used are normalized as follows
+// x: [0.0, 1.0]
+// y: [0.0, 1/ASPECT_RATIO]
+// origin at top-left
+//
 constexpr int NUM_SHAPES = 5;
 constexpr int MAX_SCORE = 100;  // score will wrap
 
