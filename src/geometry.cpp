@@ -215,25 +215,21 @@ Shape make_oval(float radius, float line_thickness, const glm::vec4 &line_color,
     return make_shape(vert, line_thickness, line_color, fill_color);
 }
 
-std::vector<Shape> make_shape_set(const glm::vec4 &line_color, const std::map<std::string, glm::vec4> &palette) {
+std::vector<Shape> make_shape_set(const glm::vec4 &line_color, std::vector<glm::vec4> color_palette) {
     constexpr float line_thickness = 0.1f;  // normalize
 
     // randomly color for each shape
     std::random_device rd;
     std::mt19937 g(rd());
 
-    std::vector<glm::vec4> color;
-    for (auto [_, col] : palette) {
-        color.push_back(col);
-    }
-    std::shuffle(color.begin(), color.end(), g);
+    std::shuffle(color_palette.begin(), color_palette.end(), g);
 
     std::vector<Shape> ret;
 
     size_t idx = 0;
     auto next_color = [&]() -> glm::vec4 {
-        idx = (idx + 1) % palette.size();
-        return color[idx];
+        idx = (idx + 1) % color_palette.size();
+        return color_palette[idx];
     };
 
     for (int sides = 3; sides <= 9; sides++) {

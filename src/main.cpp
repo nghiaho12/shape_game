@@ -1,4 +1,3 @@
-#include <SDL3/SDL_events.h>
 #define SDL_MAIN_USE_CALLBACKS  // use the callbacks instead of main()
 #define GL_GLEXT_PROTOTYPES
 
@@ -32,6 +31,7 @@
 #include "geometry.hpp"
 #include "gl_helper.hpp"
 #include "log.hpp"
+#include "color_palette.hpp"
 
 constexpr int NUM_SHAPES = 5;
 constexpr int MAX_SCORE = 100;  // score will wrap
@@ -39,44 +39,31 @@ constexpr int MAX_SCORE = 100;  // score will wrap
 constexpr float ASPECT_RATIO = 4.f / 3.f;
 constexpr float NORM_HEIGHT = 1.f / ASPECT_RATIO;
 
-const glm::vec4 BG_COLOR{0.3f, 0.3f, 0.3f, 1.f};
+const glm::vec4 BG_COLOR = Color::darkgrey;
 
 constexpr float SHAPE_ROTATION_SPEED = static_cast<float>(M_PI_2);
 constexpr float SHAPE_RADIUS = (1.f / NUM_SHAPES) * 0.4f;
-const glm::vec4 SHAPE_LINE_COLOR{1.f, 1.f, 1.f, 1.f};
+const glm::vec4 SHAPE_LINE_COLOR = Color::white;
 
-const glm::vec4 FONT_FG{231 / 255.0, 202 / 255.0, 96 / 255.0, 1.0};
-const glm::vec4 FONT_BG{0, 0, 0, 0};
-const glm::vec4 FONT_OUTLINE{1, 1, 1, 1};
+const glm::vec4 FONT_FG = Color::yellow;
+const glm::vec4 FONT_BG = Color::transparent;
+const glm::vec4 FONT_OUTLINE = Color::white;
 constexpr float FONT_OUTLINE_FACTOR = 0.1f;
 constexpr float FONT_WIDTH = 0.2f;
 
-std::map<std::string, glm::vec4> tableau10_palette() {
-    const std::map<std::string, uint32_t> color{
-        {"blue", 0x5778a4},
-        {"orange", 0xe49444},
-        {"red", 0xd1615d},
-        {"teal", 0x85b6b2},
-        {"green", 0x6a9f58},
-        {"yellow", 0xe7ca60},
-        {"purple", 0xa87c9f},
-        {"pink", 0xf1a2a9},
-        {"brown", 0x967662},
-        {"grey", 0xb8b0ac},
+std::vector<glm::vec4> shape_color_palette() {
+    return {
+        Color::blue,
+        Color::orange,
+        Color::red,
+        Color::teal,
+        Color::green,
+        Color::yellow,
+        Color::purple,
+        Color::pink,
+        Color::brown,
+        Color::grey,
     };
-
-    std::map<std::string, glm::vec4> ret;
-
-    for (auto it : color) {
-        uint32_t c = it.second;
-        uint8_t r = static_cast<uint8_t>(c >> 16);
-        uint8_t g = (c >> 8) & 0xff;
-        uint8_t b = c & 0xff;
-
-        ret[it.first] = {r / 255.f, g / 255.f, b / 255.f, 1.0f};
-    }
-
-    return ret;
 }
 
 enum class AudioEnum { BGM, CORRECT, WIN };
@@ -366,7 +353,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         as->draw_area_bg = make_shape(vertex, 0, {}, BG_COLOR);
     }
 
-    as->shape_set = make_shape_set(SHAPE_LINE_COLOR, tableau10_palette());
+    as->shape_set = make_shape_set(SHAPE_LINE_COLOR, shape_color_palette());
 
     for (auto &s : as->shape_set) {
         s.scale = SHAPE_RADIUS;
