@@ -15,7 +15,6 @@ precision mediump float;
 
 layout(location = 0) in vec2 pos; // normalized by drawinga area width
 
-uniform float screen_scale; // scale normalized units to screen pixels
 uniform vec2 drawing_area_offset; // screen pixel units
 uniform float scale; // scale to apply on normalized units
 uniform float theta; // rotation in radians
@@ -27,8 +26,7 @@ void main() {
     float s = sin(theta);
     mat2 rotation = mat2(c, s, -s, c);
 
-    vec2 screen_pos = screen_scale*(rotation*pos*scale + trans) + drawing_area_offset;
-    gl_Position = ortho_matrix * vec4(screen_pos, 0.0, 1.0);
+    gl_Position = ortho_matrix * vec4(rotation*pos*scale + trans, 0.0, 1.0);
 })";
 
 const char *fragment_shader = R"(#version 300 es
@@ -262,20 +260,6 @@ bool ShapeShader::init() {
     return false;
 }
 
-void ShapeShader::set_screen_scale(float scale) {
-    assert(shader);
-    shader->use();
-    glUniform1f(shader->get_loc("screen_scale"), scale);
-    screen_scale = scale;
-}
-
-void ShapeShader::set_drawing_area_offset(const glm::vec2 &offset) {
-    assert(shader);
-    shader->use();
-    glUniform2fv(shader->get_loc("drawing_area_offset"), 1, glm::value_ptr(offset));
-    drawing_area_offset = offset;
-}
-
 void ShapeShader::set_ortho(const glm::mat4 &ortho) {
     assert(shader);
     shader->use();
@@ -283,11 +267,11 @@ void ShapeShader::set_ortho(const glm::mat4 &ortho) {
 }
 
 glm::vec2 normalize_pos_to_screen_pos(const ShapeShader &shader, const glm::vec2 &pos) {
-    return shader.drawing_area_offset + pos * shader.screen_scale;
+    return shader.draw_area_offset + pos * shader.draw_area_size.x;
 }
 
 glm::vec2 screen_pos_to_normalize_pos(const ShapeShader &shader, const glm::vec2 &pos) {
-    return (pos - shader.drawing_area_offset) / shader.screen_scale;
+    return (pos - shader.draw_area_offset) / shader.draw_area_size.x;
 }
 
 void draw_shape(const ShapeShader &shape_shader, const Shape &shape, bool fill, bool line, bool line_highlight) {

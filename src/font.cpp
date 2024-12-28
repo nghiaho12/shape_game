@@ -18,14 +18,11 @@ layout(location = 1) in vec2 atlas_tex_coord;
 
 uniform mat4 ortho_matrix;
 uniform vec2 trans;
-uniform float screen_scale;
-uniform float target_width;
-uniform vec2 drawing_area_offset;
+uniform float font_width;
 out vec2 texCoord;
 
 void main() {
-    vec2 screen_pos = screen_scale*(pos*target_width + trans) + drawing_area_offset;
-    gl_Position = ortho_matrix * vec4(screen_pos, 0.0, 1.0);
+    gl_Position = ortho_matrix * vec4(pos*font_width + trans, 0.0, 1.0);
     texCoord = atlas_tex_coord;
 })";
 
@@ -35,14 +32,14 @@ precision mediump float;
 in vec2 texCoord;
 out vec4 color;
 uniform sampler2D msdf;
-uniform float screen_scale;
 uniform vec4 bg_color;
 uniform vec4 fg_color;
 uniform vec4 outline_color;
 uniform float outline_factor;
 uniform float distance_range;
 uniform float grid_width;
-uniform float target_width;
+uniform float display_width;
+uniform float font_width;
 
 float median(float r, float g, float b) {
     return max(min(r, g), min(max(r, g), b));
@@ -52,8 +49,8 @@ void main() {
     vec3 msd = texture(msdf, texCoord).rgb;
     float sd = median(msd.r, msd.g, msd.b);
 
-    float norm_grid_width = grid_width / screen_scale;
-    float range_scale = target_width / norm_grid_width;
+    float norm_grid_width = grid_width / display_width;
+    float range_scale = font_width / norm_grid_width;
 
     float screen_px_range = distance_range * range_scale;
     float dist_px = screen_px_range*(sd - 0.5) + 0.5;
@@ -214,9 +211,9 @@ std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> FontAtlas::make_text_ve
     return {vertex_uv, index};
 }
 
-VertexBufferPtr FontAtlas::make_text(const std::string &str, bool normalize) {
+std::pair<VertexBufferPtr, BBox> FontAtlas::make_text(const std::string &str, bool normalize) {
     auto [vertex_uv, index] = make_text_vertex(str, normalize);
-    return make_vertex_buffer(vertex_uv, index);
+    return {make_vertex_buffer(vertex_uv, index), bbox(vertex_uv)};
 }
 
 bool FontShader::init(const FontAtlas &font_atlas) {
@@ -245,9 +242,9 @@ void FontShader::set_font_grid_width(float grid_width) const {
     glUniform1f(shader->get_loc("grid_width"), grid_width);
 }
 
-void FontShader::set_font_target_width(float target_width) const {
+void FontShader::set_font_width(float font_width) const {
     assert(shader);
-    glUniform1f(shader->get_loc("target_width"), target_width);
+    glUniform1f(shader->get_loc("font_width"), font_width);
 }
 
 void FontShader::set_font_distance_range(float range) const {
@@ -285,14 +282,8 @@ void FontShader::set_ortho(const glm::mat4 &ortho) const {
     glUniformMatrix4fv(shader->get_loc("ortho_matrix"), 1, GL_FALSE, glm::value_ptr(ortho));
 }
 
-void FontShader::set_screen_scale(float scale) const {
+void FontShader::set_display_width(float display_width) const {
     assert(shader);
     shader->use();
-    glUniform1f(shader->get_loc("screen_scale"), scale);
-}
-
-void FontShader::set_drawing_area_offset(const glm::vec2 &offset) const {
-    assert(shader);
-    shader->use();
-    glUniform2fv(shader->get_loc("drawing_area_offset"), 1, glm::value_ptr(offset));
+    glUniform1f(shader->get_loc("display_width"), display_width);
 }

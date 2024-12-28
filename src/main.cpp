@@ -139,17 +139,19 @@ bool resize_event(AppState &as) {
     }
 
     glViewport(0, 0, win_w, win_h);
-    glm::mat4 ortho = glm::ortho(0.f, win_wf, win_hf, 0.f);
 
-    float scale = draw_area_size.x;
+    auto norm_x = [=](float x) { return (x - draw_area_offset.x) / draw_area_size.x; };
+    auto norm_y = [=](float y) { return (y - draw_area_offset.y) / draw_area_size.x; };
+
+    glViewport(0, 0, win_w, win_h);
+    glm::mat4 ortho = glm::ortho(norm_x(0.f), norm_x(win_wf), norm_y(win_hf), norm_y(0.f));
 
     as.shape_shader.set_ortho(ortho);
-    as.shape_shader.set_drawing_area_offset(draw_area_offset);
-    as.shape_shader.set_screen_scale(scale);
+    as.shape_shader.draw_area_offset = draw_area_offset;
+    as.shape_shader.draw_area_size = draw_area_size;
 
     as.font_shader.set_ortho(ortho);
-    as.font_shader.set_screen_scale(scale);
-    as.font_shader.set_drawing_area_offset(draw_area_offset);
+    as.font_shader.set_display_width(draw_area_size.x);
 
     return true;
 }
@@ -228,7 +230,7 @@ bool init_font(AppState &as, const std::string &base_path) {
 
     as.font_shader.set_font_distance_range(static_cast<float>(as.font.distance_range));
     as.font_shader.set_font_grid_width(static_cast<float>(as.font.grid_width));
-    as.font_shader.set_font_target_width(FONT_WIDTH);
+    as.font_shader.set_font_width(FONT_WIDTH);
 
     as.font_shader.set_fg(FONT_FG);
     as.font_shader.set_bg(FONT_BG);
@@ -335,7 +337,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     // pre-allocate all vertex we need
     // number of space needs to be >= MAX_SCORE string
-    as->score_vertex = as->font.make_text("    ", true);
+    std::tie(as->score_vertex, std::ignore) = as->font.make_text("    ", true);
     update_score_text(*as);
 
     if (!as->shape_shader.init()) {

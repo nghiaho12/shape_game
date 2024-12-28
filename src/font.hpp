@@ -33,7 +33,7 @@ struct FontAtlas {
     std::map<int, Glyph> glyph;
 
     bool load(const std::string &atlas_path, const std::string &atlas_txt);
-    VertexBufferPtr make_text(const std::string &str, bool normalize);
+    std::pair<VertexBufferPtr, BBox> make_text(const std::string &str, bool normalize);
     std::pair<std::vector<glm::vec4>, std::vector<uint32_t>> make_text_vertex(const std::string &str, bool normalize);
 
     std::pair<glm::vec2, glm::vec2> get_char_uv(char ch);
@@ -47,13 +47,11 @@ struct FontShader {
 
     // call when window resizes
     void set_ortho(const glm::mat4 &ortho) const;
-    void set_screen_scale(float scale) const;
-    void set_drawing_area_offset(const glm::vec2 &offset) const;
+    void set_display_width(float display_width) const;
 
-    // call in init usually
     void set_font_distance_range(float range) const;
     void set_font_grid_width(float range) const;
-    void set_font_target_width(float target_width) const;
+    void set_font_width(float font_width) const;
 
     void set_trans(const glm::vec2 &trans) const;
     void set_fg(const glm::vec4 &color) const;
