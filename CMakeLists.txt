@@ -43,9 +43,47 @@ if (EMSCRIPTEN)
 
     set(CPACK_GENERATOR "ZIP")
     include(CPack)
+elseif(WIN32)
+    target_link_directories(${EXECUTABLE_NAME} PRIVATE /win32/lib)
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE GLESv2)
+    target_link_options(${EXECUTABLE_NAME} PRIVATE -static-libgcc -static-libstdc++)
+
+    install(TARGETS ${EXECUTABLE_NAME} RUNTIME DESTINATION .)
+    install(DIRECTORY assets DESTINATION .)
+    install(DIRECTORY /win32/share/licenses DESTINATION .)
+    install(FILES 
+        README.md 
+        LICENSE 
+        /win32/bin/SDL3.dll
+        /win32/bin/libGLESv2.dll
+        /win32/bin/libEGL.dll
+        /usr/x86_64-w64-mingw32/lib/zlib1.dll
+        /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll
+        /tmp/mingw64/bin/libstdc++-6.dll # libGLESv2.dll needs this specific version
+        /tmp/mingw64/bin/libgcc_s_seh-1.dll # libGLESv2.dll 
+        DESTINATION .)
+
+    set(CPACK_GENERATOR "ZIP")
+    include(CPack)
+else()
+    # Linux
+    install(TARGETS ${EXECUTABLE_NAME} RUNTIME DESTINATION .)
+    install(DIRECTORY assets DESTINATION .)
+    install(DIRECTORY /usr/local/share/licenses DESTINATION .)
+    install(FILES 
+        README.md 
+        LICENSE 
+        /usr/local/lib/libSDL3.so
+        /usr/local/lib/libSDL3.so.0
+        /usr/local/lib/libSDL3.so.0.1.7
+        DESTINATION .)
+
+    set(CPACK_GENERATOR "TGZ")
+    include(CPack)
 endif()
 
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(SDL3 REQUIRED)
 find_package(OpenGL REQUIRED)
+
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3 ${OPENGL_LIBRARIES})

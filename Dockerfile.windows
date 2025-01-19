@@ -1,0 +1,65 @@
+FROM debian:12.8
+
+RUN apt update && \
+    apt install -y g++ git cmake wget unzip pkg-config python3 autoconf libtool \
+    bzip2 unzip wget sox gfortran mingw-w64
+
+ENV AR=x86_64-w64-mingw32-ar
+ENV LD=x86_64-w64-mingw32-ld
+ENV RANLIB=x86_64-w64-mingw32-ranlib
+ENV CC=x86_64-w64-mingw32-gcc-posix 
+ENV CXX=x86_64-w64-mingw32-g++-posix
+ENV RANLIB=x86_64-w64-mingw32-ranlib
+
+COPY cmake/x86_64-w64-mingw32.cmake /
+
+RUN git clone https://github.com/libsdl-org/SDL.git
+RUN cd SDL && \
+    git checkout 2d37903 && \
+    cmake -B build \
+        -DCMAKE_TOOLCHAIN_FILE=/x86_64-w64-mingw32.cmake \
+        -DSDL_OPENGLES=ON && \
+    cmake --build build --parallel 6 && \
+    cmake --install build --prefix=/win32
+RUN cp -r /SDL/src/video/khronos/GLES2 /win32/include/GLES2
+
+RUN git clone -b 1.0.1 --depth 1 https://github.com/g-truc/glm.git
+RUN cd /glm && \
+    cmake -B build \
+        -DCMAKE_TOOLCHAIN_FILE=/x86_64-w64-mingw32.cmake \
+        -DGLM_BUILD_TESTS=OFF \
+        -DBUILD_SHARED_LIBS=OFF && \
+    cmake --build build && \
+    cmake --install build --prefix=/win32
+RUN mkdir -p /win32/share/licenses/glm && \
+    cp /glm/copying.txt /win32/share/licenses/glm
+
+# OpenGL ES2 support for Windows
+RUN wget https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-angleproject-2.1.r21358.2e285bb5-8-any.pkg.tar.zst 
+RUN apt install -y zstd libz-mingw-w64
+RUN tar --zstd -xvf mingw-w64-x86_64-angleproject-2.1.r21358.2e285bb5-8-any.pkg.tar.zst && \
+    cd mingw64 && \
+    cp -rf * /win32
+
+# The angle project lib needs DLLs from MSYS2. 
+RUN cd /tmp && \
+    wget https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-libs-14.2.0-2-any.pkg.tar.zst && \
+    tar --zstd -xvf mingw-w64-x86_64-gcc-libs-14.2.0-2-any.pkg.tar.zst
+
+WORKDIR /shape_game
+COPY src /shape_game/src
+COPY assets /shape_game/assets
+COPY CMakeLists.txt /shape_game
+COPY README.md /shape_game
+COPY LICENSE /shape_game
+
+RUN cmake -B build \
+        -DCMAKE_TOOLCHAIN_FILE=/x86_64-w64-mingw32.cmake && \
+    VERBOSE=1 cmake --build build --parallel 6 && \
+    cd build && \
+    make package && \
+    mkdir -p release && \
+    mv *.zip release
+
+CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/shape_game/build/release"]
+
