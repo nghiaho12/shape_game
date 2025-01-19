@@ -14,20 +14,20 @@ You'll also need to have Docker installed, e.g. ```sudo apt install docker-ce```
 The default Linux target is Debian 12.8. Edit Dockerfile.linux to match your distro if you run into problems with the binary.
 
 ```
-docker build -f Dockerfile.linux -t abc_speak:linux .
-docker run --rm -it --network=host abc_speak:linux
+docker build -f Dockerfile.linux -t shape_game:linux .
+docker run --rm -it --network=host shape_game:linux
 ```
 Go to http://localhost:8000 to download the release package.
 
 The tarball comes with SDL3 shared library bundled. Run the binary by calling
 ```
-LD_LIBRARY_PATH=. ./abc_speak
+LD_LIBRARY_PATH=. ./shape_game
 ```
 
 ## Windows
 ```
-docker build -f Dockerfile.windows -t abc_speak:windows .
-docker run --rm -it --network=host abc_speak:windows
+docker build -f Dockerfile.windows -t shape_game:windows .
+docker run --rm -it --network=host shape_game:windows
 ```
 
 Point your browser to http://localhost:8000 to download the release package.
@@ -36,16 +36,16 @@ Point your browser to http://localhost:8000 to download the release package.
 The APK is targeted at Android 9 (API Level 28) and above.
 
 ```
-docker build -f Dockerfile.android -t abc_speak:android .
-docker run --rm -it --network=host abc_speak:android
+docker build -f Dockerfile.android -t shape_game:android .
+docker run --rm -it --network=host shape_game:android
 ```
 
 Point your Android web browser to http://localhost:8000 to download the APK.
 
 ## Web
 ```
-docker build -f Dockerfile.wasm -t abc_speak:wasm .
-docker run --rm -it --network=host abc_speak:wasm
+docker build -f Dockerfile.wasm -t shape_game:wasm .
+docker run --rm -it --network=host shape_game:wasm
 ```
 
 Point your browser to http://localhost:8000 to download the release package.
