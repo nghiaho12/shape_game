@@ -3,7 +3,7 @@ Simple shape matching game for kids written using SDL3 and OpenGL ES.
 ![screenshot](screenshot.png)
 
 # Binary release
-See the Github releases page for Linux, Windows, Android and web binaries.
+See the Github releases page.
 
 # Building from source
 ## Prerequisite
