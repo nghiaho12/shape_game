@@ -1,3 +1,4 @@
+#include <SDL3/SDL_video.h>
 #define SDL_MAIN_USE_CALLBACKS  // use the callbacks instead of main()
 #define GL_GLEXT_PROTOTYPES
 
@@ -314,9 +315,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     // Android
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 
-    if (!SDL_CreateWindowAndRenderer(
-            "Shape Game", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL, &as->window, &as->renderer)) {
-        LOG("SDL_CreateWindowAndRenderer failed");
+    if (!SDL_CreateWindowAndRenderer("Shape Game",
+                                     640,
+                                     480,
+                                     SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS,
+                                     &as->window,
+                                     &as->renderer)) {
+        LOG("SDL_CreateWindowAndRenderer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
@@ -397,6 +402,15 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
                 return SDL_APP_SUCCESS;
             }
 #endif
+            if (event->key.key == SDLK_F) {
+                auto flags = SDL_GetWindowFlags(as.window);
+                if (flags & SDL_WINDOW_FULLSCREEN) {
+                    SDL_SetWindowFullscreen(as.window, false);
+                } else {
+                    SDL_SetWindowFullscreen(as.window, true);
+                }
+            }
+
             break;
 
         case SDL_EVENT_WINDOW_RESIZED:

@@ -1,5 +1,6 @@
 #pragma once
 
+#define GL_GLEXT_PROTOTYPES
 #include <SDL3/SDL_opengles2.h>
 
 #include <glm/vec2.hpp>

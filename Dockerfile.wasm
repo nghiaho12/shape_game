@@ -9,39 +9,43 @@ RUN git clone -b $EMSDK_VER --depth 1 https://github.com/emscripten-core/emsdk.g
 RUN cd emsdk && \
     ./emsdk install $EMSDK_VER
 
-RUN git clone -b preview-3.1.6 --depth 1 https://github.com/libsdl-org/SDL.git
+SHELL ["/bin/bash", "-c"]
 
-RUN cd /emsdk && \
-    ./emsdk activate $EMSDK_VER && \
-    . ./emsdk_env.sh && \
+RUN git clone -b preview-3.1.6 --depth 1 https://github.com/libsdl-org/SDL.git
+RUN /emsdk/emsdk activate $EMSDK_VER && \
+    source /emsdk/emsdk_env.sh && \
     cd /SDL && \
-    mkdir build && \
-    cd build && \
-    emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && \
-    emmake make -j4 && \
-    emmake make install
+    emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release  && \
+    cmake --build build --parallel 6 && \
+    cmake --install build --prefix=/wasm
 
 RUN git clone -b 1.0.1 --depth 1 https://github.com/g-truc/glm.git
-
-RUN cd /emsdk && \
-    ./emsdk activate $EMSDK_VER && \
-    . ./emsdk_env.sh && \
+RUN /emsdk/emsdk activate $EMSDK_VER && \
+    source /emsdk/emsdk_env.sh && \
     cd /glm && \
-    mkdir build && \
-    cd build && \
-    emcmake cmake -DGLM_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF .. && \
-    emmake make && \
-    emmake make install
+    emcmake cmake -B build -DGLM_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF && \
+    cmake --build build && \
+    cmake --install build --prefix=/wasm
+RUN mkdir -p /wasm/share/licenses/glm && \
+    cp /glm/copying.txt /wasm/share/licenses/glm
 
 WORKDIR /shape_game
 COPY CMakeLists.txt /shape_game
+COPY README.md /shape_game
+COPY LICENSE /shape_game
+COPY wasm/index.html /shape_game
 COPY src/ /shape_game/src/
 COPY assets/ /shape_game/assets/
 
-RUN mkdir build && \
+RUN /emsdk/emsdk activate $EMSDK_VER && \
+    source /emsdk/emsdk_env.sh && \
+    emcmake cmake -B build && \
+    cmake --build build --parallel 6 && \
     cd build && \
-    /bin/bash -c ". /emsdk/emsdk_env.sh && emcmake cmake .. && VERBOSE=1 emmake make"
+    make package && \
+    mkdir -p release && \
+    mv *.zip release
 
 COPY wasm/index.html /shape_game/build
 
-CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/shape_game/build"]
+CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/shape_game/build/release"]

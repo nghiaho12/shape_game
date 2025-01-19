@@ -1,14 +1,13 @@
-#include <GLES2/gl2.h>
-
-#include <glm/gtc/type_ptr.hpp>
 #define GL_GLEXT_PROTOTYPES
+#include "gl_helper.hpp"
+
 #include <SDL3/SDL_opengles2.h>
 #include <SDL3/SDL_surface.h>
 
+#include <glm/gtc/type_ptr.hpp>
 #include <memory>
 #include <vector>
 
-#include "gl_helper.hpp"
 #include "log.hpp"
 
 namespace {
@@ -37,6 +36,7 @@ bool compile_shader(GLuint s, const char *shader) {
     return true;
 }
 
+#ifdef __linux__
 void debug_callback(GLenum source,
                     GLenum type,
                     GLuint id,
@@ -56,11 +56,12 @@ void debug_callback(GLenum source,
     (void)(length);
     (void)(userParam);
 }
+#endif
 
 }  // namespace
 
 void enable_gl_debug_callback() {
-#ifndef __EMSCRIPTEN__
+#ifdef __linux__
     glEnable(GL_DEBUG_OUTPUT_KHR);
     glDebugMessageCallbackKHR(debug_callback, 0);
 #endif
@@ -75,6 +76,7 @@ VertexArrayPtr make_vertex_array() {
     };
 
     VertexArrayPtr v(new VertexArray, cleanup);
+
     glGenVertexArraysOES(1, &v->vao);
 
     return v;
@@ -122,7 +124,7 @@ ShaderPtr make_shader(const char *vertex_code, const char *fragment_code) {
 TexturePtr make_texture(const std::string &bmp_path) {
     SDL_Surface *bmp = SDL_LoadBMP(bmp_path.c_str());
     if (!bmp) {
-        LOG("Failed to loat font atlas: %s", bmp_path.c_str());
+        LOG("Failed to load texture: %s", bmp_path.c_str());
         return {{}, {}};
     }
 
@@ -164,11 +166,11 @@ VertexBufferPtr make_vertex_buffer(const std::vector<glm::vec4> &vertex, const s
 
 VertexBufferPtr make_vertex_buffer(const float *vertex, size_t vertex_bytes, const std::vector<uint32_t> &index) {
     auto cleanup = [](VertexBuffer *v) {
-        LOG("deleting vertex and index buffer: %d(%ld bytes) %d(%ld count)",
+        LOG("deleting vertex and index buffer: %d(%d bytes) %d(%d count)",
             v->vertex,
-            v->vertex_bytes,
+            static_cast<int>(v->vertex_bytes),
             v->index,
-            v->index_count);
+            static_cast<int>(v->index_count));
         glDeleteBuffers(1, &v->vertex);
         glDeleteBuffers(1, &v->index);
     };

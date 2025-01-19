@@ -1,15 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
-project(shape_game)
+project(shape_game VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -Wpedantic -Wconversion")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic -Wconversion")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for nvim LSP support
 
 set(EXECUTABLE_NAME ${PROJECT_NAME})
-set(OpenGL_GL_PREFERENCE LEGACY)
-
-find_package(SDL3 REQUIRED)
-find_package(OpenGL REQUIRED)
 
 add_executable(${EXECUTABLE_NAME}
     src/main.cpp
@@ -26,11 +22,30 @@ add_executable(${EXECUTABLE_NAME}
     src/log.hpp
 )
 
-target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3 ${OPENGL_LIBRARIES})
+file(CREATE_LINK "${PROJECT_SOURCE_DIR}/assets" "${CMAKE_BINARY_DIR}/assets" SYMBOLIC)
 
-if (CMAKE_SYSTEM_NAME MATCHES Emscripten)
-    file(CREATE_LINK "${PROJECT_SOURCE_DIR}/assets" "${CMAKE_BINARY_DIR}/assets" SYMBOLIC)
+if (EMSCRIPTEN)
+    set(CMAKE_FIND_ROOT_PATH /wasm)
 	set(CMAKE_EXECUTABLE_SUFFIX ".html" CACHE INTERNAL "")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os") # optimize for size
+
+    target_link_directories(${EXECUTABLE_NAME} PRIVATE /wasm/lib)
     target_link_options(${EXECUTABLE_NAME} PRIVATE -sFULL_ES3 -sALLOW_MEMORY_GROWTH --embed-file assets)
+
+    install(DIRECTORY /wasm/share/licenses DESTINATION .)
+    install(FILES 
+        README.md 
+        LICENSE 
+        index.html 
+        ${CMAKE_BINARY_DIR}/${EXECUTABLE_NAME}.wasm
+        ${CMAKE_BINARY_DIR}/${EXECUTABLE_NAME}.js
+        DESTINATION .)
+
+    set(CPACK_GENERATOR "ZIP")
+    include(CPack)
 endif()
+
+set(OpenGL_GL_PREFERENCE LEGACY)
+find_package(SDL3 REQUIRED)
+find_package(OpenGL REQUIRED)
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3 ${OPENGL_LIBRARIES})
