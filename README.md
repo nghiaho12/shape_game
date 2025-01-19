@@ -1,46 +1,62 @@
 Simple shape matching game for kids written using SDL3 and OpenGL ES.
-It rus on Ubuntu 24.04, Android 14, Firefox 130.0 and Chromimum 131.0.
 
 ![screenshot](screenshot.png)
 
-# Install
+# Binary release
+See the Github releases page for Linux, Windows, Android and web binaries.
+
+# Building from source
 ## Prerequisite
-This repo uses git LFS for the assets. Install it before cloning.
-```
-sudo apt install git-lfs
-```
-
-Install Docker if you want to build for Android or web.
-```
-sudo apt install docker-ce
-```
-
-For Linux, install SDL 3 (https://github.com/libsdl-org/SDL/).
+This repo uses git LFS for the assets. Install it before cloning, e.g. ```sudo apt install git-lfs```.
+You'll also need to have Docker installed, e.g. ```sudo apt install docker-ce```.
 
 ## Linux
+The default Linux target is Debian 12.8. Edit Dockerfile.linux to match your distro if you run into problems with the binary.
+
 ```
-cmake -B build
-cmake --build build
-./build/shape_game
+docker build -f Dockerfile.linux -t abc_speak:linux .
+docker run --rm -it --network=host abc_speak:linux
+```
+Go to http://localhost:8000 to download the release package.
+
+The tarball comes with SDL3 shared library bundled. Run the binary by calling
+```
+LD_LIBRARY_PATH=. ./abc_speak
 ```
 
-Hit ESC to quit.
+## Windows
+```
+docker build -f Dockerfile.windows -t abc_speak:windows .
+docker run --rm -it --network=host abc_speak:windows
+```
+
+Point your browser to http://localhost:8000 to download the release package.
+
+## Android
+The APK is targeted at Android 9 (API Level 28) and above.
+
+```
+docker build -f Dockerfile.android -t abc_speak:android .
+docker run --rm -it --network=host abc_speak:android
+```
+
+Point your Android web browser to http://localhost:8000 to download the APK.
 
 ## Web
 ```
-docker build -f Dockerfile.wasm -t shape_game_wasm .
-docker run --rm --network=host shape_game_wasm
+docker build -f Dockerfile.wasm -t abc_speak:wasm .
+docker run --rm -it --network=host abc_speak:wasm
 ```
 
-Point your browser to http://localhost:8000.
+Point your browser to http://localhost:8000 to download the release package.
+If you have Python installed you can run the app by calling
 
-## Android
 ```
-docker build -f Dockerfile.android -t shape_game_android .
-docker run --rm --network=host shape_game_android
+python3 -m http.server
 ```
 
-Point your Android web browser to http://[IP of host]:8000. Download and install the APK.
+inside the extracted folder and point your browser to http://localhost:8000.
+
 
 # Credits
 Sound assets 
