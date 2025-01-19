@@ -58,6 +58,13 @@ COPY android/Android.mk /SDL/build/org.libsdl.shape_game/app/jni/src
 COPY android/AndroidManifest.xml /SDL/build/org.libsdl.shape_game/app/src/main
 COPY android/res/ /SDL/build/org.libsdl.shape_game/app/src/main/res/
 
+# third party licenses
+RUN cd /SDL/build/org.libsdl.shape_game/app/src/main/assets && \
+    mkdir licenses && \
+    cd licenses && \
+    mkdir SDL3 && cp /SDL/LICENSE.txt SDL3 && \
+    mkdir glm && cp /glm/copying.txt glm
+
 RUN cd /SDL/build/org.libsdl.shape_game && \
     ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=/android-ndk-r27c ./gradlew assembleDebug
 
