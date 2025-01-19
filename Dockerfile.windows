@@ -42,7 +42,8 @@ RUN tar --zstd -xvf mingw-w64-x86_64-angleproject-2.1.r21358.2e285bb5-8-any.pkg.
     cp -rf * /win32
 
 # The angle project lib needs DLLs from MSYS2. 
-RUN cd /tmp && \
+RUN mkdir /msys2 && \
+    cd /msys2 && \
     wget https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-libs-14.2.0-2-any.pkg.tar.zst && \
     tar --zstd -xvf mingw-w64-x86_64-gcc-libs-14.2.0-2-any.pkg.tar.zst
 
