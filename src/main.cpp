@@ -22,11 +22,6 @@
 #include <random>
 #include <vector>
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#endif
-
 #include "audio.hpp"
 #include "color_palette.hpp"
 #include "font.hpp"
@@ -116,10 +111,6 @@ bool resize_event(AppState &as) {
         LOG("%s", SDL_GetError());
         return false;
     }
-
-#ifdef __EMSCRIPTEN__
-    emscripten_set_canvas_element_size("#canvas", win_w, win_h);
-#endif
 
     float win_wf = static_cast<float>(win_w);
     float win_hf = static_cast<float>(win_h);
