@@ -66,10 +66,10 @@ RUN cd /SDL/build/org.libsdl.shape_game/app/src/main/assets && \
     mkdir glm && cp /glm/copying.txt glm
 
 RUN cd /SDL/build/org.libsdl.shape_game && \
-    ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=/android-ndk-r27c ./gradlew assembleRelease
+    ANDROID_HOME=/android-sdk ANDROID_NDK_HOME=/android-ndk-r27c ./gradlew assembleDebug
 
 ENV VERSION=1.0.0
-RUN mv /SDL/build/org.libsdl.shape_game/app/build/outputs/apk/release/app-release-unsigned.apk \
-    /SDL/build/org.libsdl.shape_game/app/build/outputs/apk/release/shape_game-${VERSION}-Android.apk
+RUN mv /SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug/app-debug.apk \
+    /SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug/shape_game-${VERSION}-Android.apk
 
-CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/SDL/build/org.libsdl.shape_game/app/build/outputs/apk/release"]
+CMD ["/usr/bin/python3", "-m", "http.server", "--directory", "/SDL/build/org.libsdl.shape_game/app/build/outputs/apk/debug"]
